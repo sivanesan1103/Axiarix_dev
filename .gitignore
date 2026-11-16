@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+storage
+coverage
+playwright-report
+test-results
+*.log
+.DS_Store
+
+# Duplicate of docs/demo/axiarix-feature-tour.mp4 (kept locally, too large for git)
+docs/demo/*.webm

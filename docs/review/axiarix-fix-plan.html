@@ -1,0 +1,441 @@
+<title>Axiarix Fix Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each change is a "finding → mockup" pair, using the app's own indigo/white look so the mockups read as the real product. */
+:root {
+  --bg: #ffffff;
+  --panel: #f7f7fb;
+  --line: #e6e5ef;
+  --ink: #15131f;
+  --ink-2: #4a4760;
+  --muted: #77738c;
+  --brand: #4b10f0;
+  --brand-soft: #efe9ff;
+  --ok: #188a4a; --ok-bg: #e5f6ec;
+  --warn: #a35a00; --warn-bg: #fff3df;
+  --bad: #c22b2b; --bad-bg: #fde9e9;
+  --app-bg: #ffffff;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f0e15; --panel: #17161f; --line: #2a2838; --ink: #f1f0f7; --ink-2: #c3c0d4; --muted: #8e8aa4;
+  --brand: #8f6bff; --brand-soft: #241c44; --ok: #4fd18b; --ok-bg: #11291c; --warn: #f0b04d; --warn-bg: #2d2210; --bad: #ff7b7b; --bad-bg: #321617; --app-bg: #14131b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f0e15; --panel: #17161f; --line: #2a2838; --ink: #f1f0f7; --ink-2: #c3c0d4; --muted: #8e8aa4;
+  --brand: #8f6bff; --brand-soft: #241c44; --ok: #4fd18b; --ok-bg: #11291c; --warn: #f0b04d; --warn-bg: #2d2210; --bad: #ff7b7b; --bad-bg: #321617; --app-bg: #14131b; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 56px }
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.02em; margin: 0 }
+h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 700 }
+h2 { font-size: 24px; font-weight: 650 }
+h3 { font-size: 16px; font-weight: 600 }
+p { margin: 0; max-width: 68ch; color: var(--ink-2) }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--brand) }
+.stack { display: grid; gap: 14px }
+.section { display: grid; gap: 22px }
+.mono { font-family: var(--mono); font-size: 12.5px }
+
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.summary div { padding: 16px 18px; border-right: 1px solid var(--line); display: grid; gap: 2px }
+.summary div:last-child { border-right: 0 }
+.summary b { font-size: 26px; font-variant-numeric: tabular-nums }
+.summary span { font-size: 13px; color: var(--muted) }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px }
+th { text-align: left; font-weight: 500; color: var(--muted); background: var(--panel); padding: 10px 14px; font-size: 13px }
+td { padding: 11px 14px; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2) }
+td:first-child { color: var(--ink); font-weight: 500; white-space: nowrap }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; white-space: nowrap }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor }
+.hi { color: var(--bad); background: var(--bad-bg) }
+.md { color: var(--warn); background: var(--warn-bg) }
+.lo { color: var(--ok); background: var(--ok-bg) }
+
+/* change cards */
+.change { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 28px; align-items: start; padding-top: 26px; border-top: 1px solid var(--line) }
+@media (max-width: 820px) { .change { grid-template-columns: minmax(0, 1fr) } }
+.change ul { margin: 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 6px; font-size: 14px }
+.tag { font-family: var(--mono); font-size: 12px; color: var(--muted) }
+
+/* app mockups */
+.mock { border: 1px solid var(--line); border-radius: 12px; background: var(--app-bg); overflow: hidden; font-size: 13px; min-width: 0 }
+.mock-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+.mock-body { padding: 16px; display: grid; gap: 12px; overflow-x: auto }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.toggle button { font: inherit; font-size: 12px; padding: 5px 12px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer }
+.toggle button[aria-pressed="true"] { background: var(--brand); color: #fff }
+.toggle button:focus-visible, .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+
+.bar { display: flex; align-items: center; gap: 8px; min-width: 560px; padding: 10px 12px; border-bottom: 1px solid var(--line) }
+.bar .title { font-weight: 600; font-size: 15px; min-width: 120px }
+.search { flex: 1; min-width: 80px; height: 32px; border-radius: 8px; background: var(--panel); color: var(--muted); display: flex; align-items: center; padding: 0 10px; font-size: 12px; white-space: nowrap; overflow: hidden }
+.sel { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--ink); white-space: nowrap }
+.sel::after { content: "▾"; color: var(--muted); font-size: 10px }
+.ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--ink-2); font-size: 14px }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--bad-bg); color: var(--bad); display: grid; place-items: center; font-size: 11px; font-weight: 600 }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 12px; min-width: 560px; background: var(--panel); border-bottom: 1px solid var(--line) }
+.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-weight: 500 }
+.chip b { margin-left: 4px; font-weight: 600 }
+.link { color: var(--brand); font-size: 12px; font-weight: 500 }
+.strike { text-decoration: line-through; color: var(--muted) }
+.note { font-size: 12px; color: var(--muted) }
+.note.bad { color: var(--bad) }
+.note.good { color: var(--ok) }
+
+.steps { display: flex; gap: 6px; flex-wrap: wrap }
+.step { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap }
+.step.done { color: var(--ok); border-color: transparent; background: var(--ok-bg) }
+.step.now { color: #fff; background: var(--brand); border-color: var(--brand) }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px }
+.field { display: grid; gap: 4px }
+.field label { font-size: 12px; color: var(--muted) }
+.input { height: 32px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; display: flex; align-items: center; color: var(--ink); font-size: 12.5px; overflow: hidden; white-space: nowrap }
+.drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 4px; text-align: center; color: var(--ink-2) }
+.mini { width: 100%; min-width: 420px; border-collapse: collapse; font-size: 12px }
+.mini th { background: var(--panel); padding: 6px 8px; font-size: 11.5px }
+.mini td { padding: 6px 8px; border-top: 1px solid var(--line); font-weight: 400; color: var(--ink-2); white-space: normal }
+.mini td:first-child { font-weight: 500; color: var(--ink) }
+.btn { font: inherit; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--app-bg); color: var(--ink); cursor: default }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff }
+.btn[disabled] { opacity: .45 }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.perm { display: grid; grid-template-columns: minmax(110px, 1fr) repeat(4, minmax(56px, auto)); gap: 0; font-size: 12px; min-width: 420px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.perm > div { padding: 6px 8px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 5px }
+.perm > .h { background: var(--panel); color: var(--muted); border-top: 0; font-size: 11.5px }
+.box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line); display: inline-grid; place-items: center; font-size: 10px; color: #fff; flex: none }
+.box.on { background: var(--brand); border-color: var(--brand) }
+.box.off { background: var(--bad-bg); border-color: var(--bad); color: var(--bad) }
+.box.na { opacity: .35 }
+
+.order { counter-reset: s; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.order li { list-style: none; counter-increment: s; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-top: 1px solid var(--line) }
+.order li:first-child { border-top: 0 }
+.order li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-weight: 600; font-size: 13px }
+.order p { font-size: 14px }
+.q { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)) }
+.q > div { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start }
+.q p { font-size: 13.5px }
+@media (prefers-reduced-motion: no-preference) { .toggle button { transition: background .15s } }
+</style>
+
+<div class="wrap">
+
+<header class="stack">
+  <span class="eyebrow">Axiarix · review of 16 Nov 2026 · implemented the same day</span>
+  <h1>What I found, and what I plan to change</h1>
+  <p>I opened every page as each role and tested the filters against the API. I also read the code for navigation, admin, organisations, users, roles and the checklist review. Every item below was reproduced on your running copy. Each change has a mockup of how it will look. Four decisions at the bottom need your answer before I start.</p>
+</header>
+
+<div class="summary" role="list">
+  <div role="listitem"><b>21</b><span>issues confirmed</span></div>
+  <div role="listitem"><b>6</b><span>high severity</span></div>
+  <div role="listitem"><b>6</b><span>areas: nav, admin, new org, limits, checklist, filters</span></div>
+  <div role="listitem"><b>4</b><span>decisions for you</span></div>
+</div>
+
+<section class="section">
+  <h2>Issues found</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Area</th><th>Issue</th><th>Severity</th></tr></thead>
+      <tbody>
+        <tr><td>Admin</td><td>An admin limited to one branch can still create organisation-wide admins, edit other branches and change their own roles. The users and organisation APIs never check the admin's scope. Your <span class="mono">test branch</span> admin has this power right now.</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>Admin</td><td>One person can run a whole assessment alone: create it, answer, upload evidence, submit, then start the audit review. The admin account did exactly that today between 06:34 and 06:37.</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>Checklist</td><td>The same person can submit a checklist for review and publish it. Admin did both 13 seconds apart today. Nobody else ever looked at it.</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>New org</td><td>You cannot create a second organisation. The API refuses with "This deployment already has an organisation". Roles are shared across the whole system, so editing a role would change it for every organisation.</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>Limits</td><td>Permissions come only from roles. To take one power away from one person, you have to take it away from everyone with that role.</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>Filters</td><td>The top-bar branch and period selectors are applied unevenly. Findings and Corrective Actions ignore the period. Evidence ignores the period. Auditor Workspace and My Assessments ignore both. (Corrected after implementation: Assessments already applied both.)</td><td><span class="pill hi">High</span></td></tr>
+        <tr><td>Top nav</td><td>The branch and period selectors disappear below 1280 px wide, so most laptops cannot filter. Search disappears below 1024 px. At 1280 px search shrinks to about 160 px.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Top nav</td><td>The page title appears twice: once in the top bar and again in the page header.</td><td><span class="pill lo">Low</span></td></tr>
+        <tr><td>Top nav</td><td>The sidebar doesn't match what people can open. ISMS can open Hospitals &amp; Branches but has no menu item. Auditor and Management can open Assessment Periods but have no menu item.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Top nav</td><td>The collapsed sidebar shows icons only, with no group headings (Programme / Audit / Admin).</td><td><span class="pill lo">Low</span></td></tr>
+        <tr><td>Admin</td><td>For 4 roles, the Settings page asks for admin settings, gets a 403 and logs a console error on every visit.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Admin</td><td>The Users page lists every user in the organisation, even for an admin limited to one branch.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Admin</td><td>No guided setup. Branches, departments, users and checklists live on four separate pages, with no "what's left to set up" list.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Checklist</td><td>A checklist version can't have a named reviewer, and reviewers can't leave comments on single questions. The only option is "return to draft" with one reason.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Checklist</td><td>The status filter matches any old version. Filtering "Archived" shows a checklist whose current version is Published.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Checklist</td><td>Imports flag 29 questions per Kauvery sheet for mapping review. The publish dialog lets you acknowledge them all in one click without opening any.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Assessments</td><td>The period is free text. <span class="mono">Q3 FY2026-28</span> was accepted today.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Filters</td><td>Filters reset when you leave a page or refresh. They aren't saved in the link, so you can't share a filtered view.</td><td><span class="pill md">Medium</span></td></tr>
+        <tr><td>Filters</td><td>No "Clear filters" button. Findings and Actions have no period filter.</td><td><span class="pill lo">Low</span></td></tr>
+        <tr><td>Reports</td><td>The Findings and Actions export buttons use the branch only and ignore the filters on screen.</td><td><span class="pill lo">Low</span></td></tr>
+        <tr><td>Data</td><td>Test runs left 12 checklists and 11 assessments named "E2E…", which crowd every list.</td><td><span class="pill lo">Low</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <h2>What each change will look like</h2>
+
+  <!-- 1 top nav -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">1 · Top navigation</span>
+      <h3>One compact bar that works on a laptop</h3>
+      <ul>
+        <li>Branch and period become one "Scope" button that stays visible at every width, with a dropdown inside.</li>
+        <li>Search is never squeezed. Below 1024 px it becomes an icon that opens a full-width search box.</li>
+        <li>Remove the repeated page title from the bar. Breadcrumbs stay.</li>
+        <li>When a filter is active, a chip row shows it on every list page, with a Clear button.</li>
+        <li>Sidebar: group headings, and menu items match what each role can open.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>Top bar at 1280 px</span>
+        <span class="toggle" role="group" aria-label="Before or after">
+          <button type="button" id="nav-before" aria-pressed="false">Today</button>
+          <button type="button" id="nav-after" aria-pressed="true">Planned</button>
+        </span>
+      </div>
+      <div class="mock-body" style="padding:0">
+        <div id="nav-today" hidden>
+          <div class="bar">
+            <span class="title">Dashboard</span>
+            <span class="search" style="flex:0 0 120px">🔍 Search assessi…</span>
+            <span class="sel">Kauvery Hospitals · All sites</span>
+            <span class="sel">All periods</span>
+            <span class="ico">🔔</span><span class="ico">☾</span><span class="ico">▤</span>
+            <span class="avatar">LI</span>
+          </div>
+          <div class="chips"><span class="note bad">At 1279 px or narrower, both selectors disappear and filtering is no longer possible.</span></div>
+          <div style="padding:14px 12px"><span class="note">Page header below repeats “Dashboard”.</span></div>
+        </div>
+        <div id="nav-planned">
+          <div class="bar">
+            <span class="note">Dashboard</span>
+            <span class="search">🔍 Search assessments, findings, evidence…  ⌘K</span>
+            <span class="sel">◎ Vadapalani · Q3 FY2026-27</span>
+            <span class="ico">🔔</span><span class="ico">☾</span>
+            <span class="avatar">LI</span>
+          </div>
+          <div class="chips">
+            <span class="note">Filtered by</span>
+            <span class="chip">Branch<b>Vadapalani</b> ✕</span>
+            <span class="chip">Period<b>Q3 FY2026-27</b> ✕</span>
+            <span class="chip">Status<b>All open</b> ✕</span>
+            <span class="link">Clear all</span>
+          </div>
+          <div style="padding:14px 12px"><span class="note good">The Scope button stays visible at every width. Every list page follows these filters, and they're saved in the page link.</span></div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- 2 admin flow -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">2 · Admin flow</span>
+      <h3>Admin home with a setup checklist, and admins kept inside their scope</h3>
+      <ul>
+        <li>New <b>Admin</b> page with setup progress and links: organisation → branches → departments → users → checklist → first assessment.</li>
+        <li>A branch admin can only manage users and departments in their own branch. They can't grant organisation-wide roles or change their own roles.</li>
+        <li>The Users page lists only users inside the admin's scope.</li>
+        <li>Settings only asks for admin settings when you have permission, so no more 403 errors.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>Admin home</span><span>Sunrise Care Hospitals (Sample)</span></div>
+      <div class="mock-body">
+        <div class="row" style="justify-content:space-between"><b>Setup · 4 of 6 done</b><span class="note">Scope: organisation-wide</span></div>
+        <div class="steps">
+          <span class="step done">✓ Organisation</span><span class="step done">✓ 3 branches</span><span class="step done">✓ 5 departments</span><span class="step done">✓ 14 users</span><span class="step now">Import checklist</span><span class="step">First assessment</span>
+        </div>
+        <table class="mini">
+          <thead><tr><th>Attempted by Kavya Bose (System Admin · Sunrise North only)</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Add user to Sunrise North / IT</td><td class="note good">Allowed</td></tr>
+            <tr><td>Add user to Sunrise Central</td><td class="note bad">Blocked: outside your branch</td></tr>
+            <tr><td>Give someone an organisation-wide role</td><td class="note bad">Blocked: needs an organisation-wide admin</td></tr>
+            <tr><td>Change own roles or restrictions</td><td class="note bad">Blocked: another admin must do it</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+
+  <!-- 3 new org -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">3 · Create a new organisation</span>
+      <h3>A five-step wizard that can start from the sample Excel</h3>
+      <ul>
+        <li>A new <b>Platform owner</b> role that only creates and manages organisations. It can't see any organisation's audit data.</li>
+        <li>Each organisation gets its own copy of the six roles, so changing a role in one organisation doesn't affect another.</li>
+        <li>Fill each step by hand, or upload <span class="mono">sample-org/01-organisation-setup.xlsx</span> and check the preview.</li>
+        <li>The first admin gets an invitation e-mail. Nobody is given a password.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>New organisation · step 3 of 5</span><span>Platform owner</span></div>
+      <div class="mock-body">
+        <div class="steps"><span class="step done">✓ Organisation</span><span class="step done">✓ Branches &amp; departments</span><span class="step now">Users</span><span class="step">Checklist</span><span class="step">Review &amp; create</span></div>
+        <div class="drop"><b>01-organisation-setup.xlsx</b><span class="note">Read 14 users · 0 errors · 1 warning</span></div>
+        <table class="mini">
+          <thead><tr><th>User</th><th>Role</th><th>Scope</th><th>Restricted</th></tr></thead>
+          <tbody>
+            <tr><td>Anita Rao</td><td>System Admin</td><td>Organisation</td><td>—</td></tr>
+            <tr><td>Neha Pillai</td><td>ISMS Owner</td><td>Organisation</td><td><span class="pill md">3 removed</span></td></tr>
+            <tr><td>Ravi Kumar</td><td>IT Owner</td><td>Central / IT &amp; Data Centre</td><td>—</td></tr>
+            <tr><td>Kavya Bose</td><td>System Admin</td><td>North</td><td>—</td></tr>
+            <tr><td>Lata Singh</td><td>Auditor</td><td>Organisation</td><td><span class="pill md">2 removed</span></td></tr>
+          </tbody>
+        </table>
+        <div class="row" style="justify-content:flex-end"><button class="btn" type="button">Back</button><button class="btn primary" type="button">Next: checklist</button></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- 4 limit power -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">4 · Limit power for selected users</span>
+      <h3>Take specific permissions away from one person without changing their role</h3>
+      <ul>
+        <li>In the user's Access panel, every permission their role gives them shows as ticked. Untick one to remove it from that person only.</li>
+        <li>Optional end date, for example a trainee auditor restricted until 31 Mar 2027.</li>
+        <li>The server enforces it on every request. Hiding the button isn't enough.</li>
+        <li>Each change is written to the audit trail with a required reason.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>Lata Singh · Access</span><span>Auditor · Organisation-wide</span></div>
+      <div class="mock-body">
+        <div class="perm" role="table" aria-label="Permissions for Lata Singh">
+          <div class="h">Area</div><div class="h">Read</div><div class="h">Create</div><div class="h">Review</div><div class="h">Export</div>
+          <div>Assessments</div><div><span class="box on">✓</span></div><div><span class="box na"></span></div><div><span class="box on">✓</span></div><div><span class="box on">✓</span></div>
+          <div>Evidence</div><div><span class="box on">✓</span></div><div><span class="box na"></span></div><div><span class="box on">✓</span></div><div><span class="box na"></span></div>
+          <div>Findings</div><div><span class="box on">✓</span></div><div><span class="box off">✕</span></div><div><span class="box on">✓</span></div><div><span class="box on">✓</span></div>
+          <div>Corrective actions</div><div><span class="box on">✓</span></div><div><span class="box na"></span></div><div><span class="box off">✕</span></div><div><span class="box na"></span></div>
+        </div>
+        <div class="row"><span class="box on">✓</span><span class="note">from role</span><span class="box off">✕</span><span class="note">removed for this user</span><span class="box na"></span><span class="note">role doesn't include it</span></div>
+        <div class="grid2">
+          <div class="field"><label for="m-until">Restriction ends</label><div class="input" id="m-until">31 Mar 2027</div></div>
+          <div class="field"><label for="m-why">Reason (audited)</label><div class="input" id="m-why">Trainee: shadow reviews only</div></div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- 5 checklist review -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">5 · Checklist review</span>
+      <h3>A real second pair of eyes before a checklist goes live</h3>
+      <ul>
+        <li>Submitting asks you to name a reviewer. The author can't publish their own version.</li>
+        <li>Reviewers can comment on individual questions. The version goes back to draft with those comments, and the author resolves them.</li>
+        <li>Flagged ISO mappings have to be opened and either confirmed or fixed. No more one-click "acknowledge all".</li>
+        <li>The same rule applies to assessments: whoever submitted can't audit it, and whoever audited can't approve it.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>Sunrise IT – IA Checklist · v1 · Under review</span><span>Reviewer: Vikram Shah</span></div>
+      <div class="mock-body">
+        <table class="mini">
+          <thead><tr><th>Q</th><th>Question</th><th>Mapping</th><th>Review</th></tr></thead>
+          <tbody>
+            <tr><td>Q-003</td><td>Risk assessment and risk treatment plan</td><td>Cl. 6.1 · 8.2 · 8.3 · A.5.7</td><td class="note good">✓ Confirmed</td></tr>
+            <tr><td>Q-004</td><td>Statement of Applicability with justifications</td><td><span class="pill md">6.1 ambiguous</span></td><td><span class="link">Pick clause or control</span></td></tr>
+            <tr><td>Q-009</td><td>Password and MFA for HIS, email, remote access</td><td>A.5.17 · A.8.5</td><td class="note">💬 “Add PACS to scope”</td></tr>
+          </tbody>
+        </table>
+        <div class="row" style="justify-content:space-between">
+          <span class="note">1 mapping to resolve · 1 open comment</span>
+          <span class="row"><button class="btn" type="button">Return with comments</button><button class="btn primary" type="button" disabled>Publish</button></span>
+        </div>
+        <span class="note bad">Publish stays disabled until every flagged mapping is resolved. It's always disabled for the version's author.</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- 6 filters -->
+  <article class="change">
+    <div class="stack">
+      <span class="tag">6 · Filters</span>
+      <h3>One filter model across every list</h3>
+      <ul>
+        <li>Branch and period from the top bar apply to Assessments, Findings, Actions, Auditor, My Assessments, Evidence and Reports.</li>
+        <li>Each page's own filters (status, severity, owner, overdue) are saved in the link, so refresh and Back keep them and you can share the link.</li>
+        <li>The checklist status filter checks the current version only.</li>
+        <li>Exports download exactly the rows shown on screen.</li>
+        <li>The period is picked from a fixed list (Q1–Q4 + FY), not typed.</li>
+      </ul>
+    </div>
+    <div class="mock">
+      <div class="mock-label"><span>Findings</span><span class="mono">/findings?site=KVP&amp;period=Q3-FY2026-27&amp;status=open</span></div>
+      <div class="mock-body">
+        <div class="row">
+          <div class="input" style="flex:1;min-width:140px">🔍 Search findings</div>
+          <span class="sel">All open</span><span class="sel">Any severity</span><span class="sel">Owned by me</span>
+          <span class="link">Clear</span>
+        </div>
+        <table class="mini">
+          <thead><tr><th>Finding</th><th>Branch</th><th>Period</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr><td>FND-2026-0007</td><td>Vadapalani</td><td>Q3 FY2026-27</td><td><span class="pill hi">Major</span></td></tr>
+            <tr><td>FND-2026-0009</td><td>Vadapalani</td><td>Q3 FY2026-27</td><td><span class="pill md">Minor</span></td></tr>
+          </tbody>
+        </table>
+        <div class="row" style="justify-content:space-between"><span class="note">2 of 9 findings match</span><span class="row"><button class="btn" type="button">Export these 2 (XLSX)</button></span></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="section">
+  <h2>Sample organisation (ready now)</h2>
+  <p>Created in <span class="mono">axiarix_demo/sample-org/</span>. It's a fictitious hospital group, and every e-mail uses the reserved <span class="mono">example.org</span> domain.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>File</th><th>Contents</th><th>Checked</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">01-organisation-setup.xlsx</td><td>Organisation, 3 branches, 5 departments, 14 users with role, scope and optional restricted permissions. Includes a branch-only admin, a restricted deputy ISMS owner, a trainee auditor and a contributor with no upload rights.</td><td>For the wizard (step 3)</td></tr>
+        <tr><td class="mono">02-checklist-internal-audit.xlsx</td><td>Same layout as the Kauvery workbook. IT sheet: 28 questions. Biomedical sheet: 8 questions. Auditee and auditor columns are left blank.</td><td><span class="pill lo">Parsed by the app's importer: 0 errors</span> 1 flagged on purpose (Q-004)</td></tr>
+        <tr><td class="mono">README.md</td><td>What each file is for and what it tests.</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Order of work</h2>
+  <ol class="order" style="margin:0;padding:0">
+    <li><div><h3>Security first</h3><p>Admin scope checks, per-user restrictions, and the rule that the same person can't author and approve (checklists and assessments). Backend tests for each.</p></div></li>
+    <li><div><h3>Top navigation and filters</h3><p>Scope button, chip row, filters saved in the link on every list, checklist status fix, exports that match the screen, fixed period list.</p></div></li>
+    <li><div><h3>Admin home and Settings</h3><p>Setup checklist, Users list limited to the admin's scope, no more 403 on Settings, sidebar that matches what each role can open.</p></div></li>
+    <li><div><h3>Checklist review</h3><p>Named reviewer, comments on questions, resolving each flagged mapping.</p></div></li>
+    <li><div><h3>New organisation</h3><p>Platform owner role, roles copied per organisation (database migration), five-step wizard with Excel import of the sample file.</p></div></li>
+    <li><div><h3>Prove it</h3><p>Run the existing tests plus new ones. Then walk the full flow in a browser for every role, using Sunrise Care as the new organisation, and send you screenshots.</p></div></li>
+  </ol>
+</section>
+
+<section class="section">
+  <h2>Decisions I need from you</h2>
+  <div class="q">
+    <div><h3>New organisation model</h3><p>Several organisations in one installation, with a Platform owner (recommended). The other option is one organisation per installation, where the wizard only sets up branches.</p></div>
+    <div><h3>How to limit power</h3><p>Per-user restrictions on top of the role (recommended, shown above). Or custom roles cloned from the six built-in ones. Or both.</p></div>
+    <div><h3>Separation of duties</h3><p>Hard block (recommended for ISO 27001 A.5.3). Or a warning that's recorded in the audit trail. Or a setting the admin turns on or off.</p></div>
+    <div><h3>Test data</h3><p>Remove only the "E2E…" records (keeps your test branch and user). Or fully reset and re-seed. Or leave everything as it is.</p></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('nav-before'), a = document.getElementById('nav-after');
+  var today = document.getElementById('nav-today'), planned = document.getElementById('nav-planned');
+  function show(isAfter) {
+    planned.hidden = !isAfter; today.hidden = isAfter;
+    a.setAttribute('aria-pressed', String(isAfter)); b.setAttribute('aria-pressed', String(!isAfter));
+  }
+  b.addEventListener('click', function () { show(false); });
+  a.addEventListener('click', function () { show(true); });
+})();
+</script>

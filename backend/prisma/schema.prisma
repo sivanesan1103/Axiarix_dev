@@ -1,0 +1,1040 @@
+// Axiarix – ISO/IEC 27001:2022 Compliance Management System
+// Relational model for the Kauvery Hospital Vadapalani IT pilot.
+// All timestamps are stored in UTC (SRS 2.3).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ChecklistVersionStatus {
+  DRAFT
+  UNDER_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MappingType {
+  ISO_CLAUSE
+  ANNEX_A
+  INTERNAL_POLICY
+  RISK
+}
+
+enum ReferenceType {
+  CLAUSE
+  ANNEX_A
+}
+
+enum AssessmentStatus {
+  DRAFT
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED_FOR_AUDIT
+  UNDER_REVIEW
+  CLARIFICATION_REQUIRED
+  REVIEWED
+  PENDING_APPROVAL
+  APPROVED
+}
+
+enum ResponseStatus {
+  COMPLIANT
+  PARTIALLY_COMPLIANT
+  NON_COMPLIANT
+  NOT_APPLICABLE
+  NOT_ASSESSED
+}
+
+enum EvidenceClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum EvidenceVerification {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CLARIFICATION_REQUESTED
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
+enum ReviewDecision {
+  ACCEPTED
+  REJECTED
+  CLARIFICATION_REQUESTED
+  COMMENT
+  REVIEW_SUBMITTED
+}
+
+enum FindingCategory {
+  MAJOR_NONCONFORMITY
+  MINOR_NONCONFORMITY
+  OBSERVATION
+  OPPORTUNITY_FOR_IMPROVEMENT
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  OBSERVATION
+}
+
+enum FindingStatus {
+  OPEN
+  ASSIGNED
+  ACTION_IN_PROGRESS
+  READY_FOR_VERIFICATION
+  CLOSED
+}
+
+enum ActionStatus {
+  PLANNED
+  IN_PROGRESS
+  SUBMITTED_FOR_VERIFICATION
+  RETURNED
+  VERIFIED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum RetentionEntity {
+  EVIDENCE
+  REPORT
+}
+
+enum RetentionAction {
+  ARCHIVE
+  REQUEST_DELETION
+}
+
+enum DeletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
+enum ImportStatus {
+  PREVIEW
+  CONFIRMED
+  DISCARDED
+  FAILED
+}
+
+enum ScheduleFrequency {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
+// ──────────────────────── Organisation ────────────────────────
+
+model Organisation {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  legalEntity String?
+  status      RecordStatus @default(ACTIVE)
+  /// The internal organisation that holds platform-owner accounts; it has no audit data and is hidden from lists.
+  isPlatform  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  roles              Role[]
+  sites              Site[]
+  departments        Department[]
+  users              User[]
+  userRoles          UserRole[]
+  checklistTemplates ChecklistTemplate[]
+  assessments        Assessment[]
+  evidence           Evidence[]
+  findings           Finding[]
+  reports            Report[]
+  scoringPolicies    ScoringPolicy[]
+  retentionPolicies  RetentionPolicy[]
+  imports            ImportedChecklist[]
+  schedules          AssessmentSchedule[]
+}
+
+model Site {
+  id             String       @id @default(uuid())
+  organisationId String
+  name           String
+  code           String
+  address        String?
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id])
+  departments  Department[]
+  userRoles    UserRole[]
+  assessments  Assessment[]
+  evidence     Evidence[]
+  findings     Finding[]
+  reports      Report[]
+  schedules    AssessmentSchedule[]
+
+  @@unique([organisationId, code])
+  @@unique([organisationId, name])
+}
+
+model Department {
+  id             String       @id @default(uuid())
+  organisationId String
+  siteId         String
+  name           String
+  ownerId        String?
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id])
+  site         Site                 @relation(fields: [siteId], references: [id])
+  owner        User?                @relation("DepartmentOwner", fields: [ownerId], references: [id])
+  userRoles    UserRole[]
+  assessments  Assessment[]
+  evidence     Evidence[]
+  findings     Finding[]
+  reports      Report[]
+  schedules    AssessmentSchedule[]
+
+  @@unique([siteId, name])
+  @@index([organisationId])
+}
+
+// ─────────────────────── Identity & access ───────────────────────
+
+model User {
+  id                   String       @id @default(uuid())
+  organisationId       String
+  email                String       @unique
+  name                 String
+  designation          String?
+  passwordHash         String
+  status               RecordStatus @default(ACTIVE)
+  mfaEnabled           Boolean      @default(false)
+  mfaSecret            String?
+  failedLoginCount     Int          @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
+  passwordChangedAt    DateTime?
+  passwordResetHash    String?
+  passwordResetExpires DateTime?
+  /// Platform owners create and manage organisations; they hold no role inside any organisation.
+  isPlatformOwner      Boolean      @default(false)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  organisation       Organisation                @relation(fields: [organisationId], references: [id])
+  roles              UserRole[]
+  restrictions       UserPermissionRestriction[] @relation("RestrictedUser")
+  refreshTokens      RefreshToken[]
+  ownedDepartments   Department[]                @relation("DepartmentOwner")
+  ownedAssessments   Assessment[]                @relation("AssessmentOwner")
+  createdAssessments Assessment[]                @relation("AssessmentCreator")
+  assignments        AssessmentAssignment[]      @relation("Assignee")
+  responses          AssessmentResponse[]
+  uploadedEvidence   Evidence[]
+  evidenceVersions   EvidenceVersion[]
+  reviews            AuditorReview[]
+  comments           ReviewComment[]
+  ownedFindings      Finding[]                   @relation("FindingOwner")
+  raisedFindings     Finding[]                   @relation("FindingRaiser")
+  ownedActions       CorrectiveAction[]          @relation("ActionOwner")
+  actionUpdates      CorrectiveActionUpdate[]
+  approvals          Approval[]
+  reports            Report[]
+  notifications      Notification[]
+  auditEvents        AuditEvent[]
+  defaultItems       ChecklistItem[]
+
+  @@index([organisationId])
+}
+
+/// Each organisation has its own copy of the roles, so changing a role's permissions never affects another organisation.
+model Role {
+  id             String   @id @default(uuid())
+  organisationId String
+  key            String
+  name           String
+  description    String?
+  isSystem       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organisation Organisation     @relation(fields: [organisationId], references: [id])
+  permissions  RolePermission[]
+  userRoles    UserRole[]
+
+  @@unique([organisationId, key])
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique // e.g. "assessment:submit"
+  resource    String
+  action      String
+  description String?
+
+  roles        RolePermission[]
+  restrictions UserPermissionRestriction[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+/// A role granted to a user within a scope. A null siteId means organisation-wide;
+/// a null departmentId means every department of the site.
+model UserRole {
+  id             String   @id @default(uuid())
+  userId         String
+  roleId         String
+  organisationId String
+  siteId         String?
+  departmentId   String?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  site         Site?        @relation(fields: [siteId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+
+  @@unique([userId, roleId, organisationId, siteId, departmentId])
+  @@index([userId])
+}
+
+/// Removes one permission from one user even though their role grants it ("limit power for selected users").
+/// Expired restrictions are ignored; every change is audited with a reason.
+model UserPermissionRestriction {
+  id           String    @id @default(uuid())
+  userId       String
+  permissionId String
+  reason       String
+  expiresAt    DateTime?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+
+  user       User       @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+// ─────────────────────── ISO reference catalogue ───────────────────────
+
+/// ISO/IEC 27001:2022 clauses 4–10 and Annex A controls 5.1–8.34.
+model IsoReference {
+  id      String        @id // "CL-6.1.2" for clauses, "A-8.15" for Annex A controls
+  code    String // "6.1.2" or "8.15"
+  type    ReferenceType
+  title   String
+  theme   String // Clause group or Annex A theme (Organizational/People/Physical/Technological)
+  parent  String? // top-level clause / theme number
+  sortKey Int
+
+  @@unique([type, code])
+}
+
+// ─────────────────────── Checklist library ───────────────────────
+
+model ChecklistTemplate {
+  id             String   @id @default(uuid())
+  organisationId String
+  title          String
+  description    String?
+  category       String?
+  ownerId        String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organisation Organisation         @relation(fields: [organisationId], references: [id])
+  versions     ChecklistVersion[]
+  schedules    AssessmentSchedule[]
+
+  @@index([organisationId])
+}
+
+/// Published versions are immutable (enforced by service layer and DB trigger).
+model ChecklistVersion {
+  id             String                 @id @default(uuid())
+  templateId     String
+  versionNumber  Int
+  status         ChecklistVersionStatus @default(DRAFT)
+  changeSummary  String?
+  effectiveDate  DateTime?
+  submittedAt    DateTime?
+  submittedById  String?
+  /// Named reviewer chosen at submission. Only this person may publish or return the version.
+  reviewerId     String?
+  publishedAt    DateTime?
+  publishedById  String?
+  archivedAt     DateTime?
+  sourceImportId String?
+  createdById    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  template       ChecklistTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items          ChecklistItem[]
+  assessments    Assessment[]
+  sourceImport   ImportedChecklist?       @relation(fields: [sourceImportId], references: [id])
+  reviewComments ChecklistReviewComment[]
+
+  @@unique([templateId, versionNumber])
+}
+
+model ChecklistItem {
+  id                  String       @id @default(uuid())
+  versionId           String
+  questionCode        String
+  sequence            Int
+  question            String
+  description         String?
+  guidance            String?
+  isoClauseRaw        String? // verbatim source text (e.g. "6, 8, 9")
+  annexControlRaw     String? // verbatim source text (e.g. "8.15 Logging, 8.16 Monitoring")
+  internalPolicyRef   String?
+  riskRef             String?
+  evidenceRequirement String?
+  evidenceMandatory   Boolean      @default(true)
+  responseMandatory   Boolean      @default(true)
+  defaultOwnerId      String?
+  priority            Priority     @default(MEDIUM)
+  category            String?
+  status              RecordStatus @default(ACTIVE)
+  sourceRowId         String?      @unique
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  version        ChecklistVersion         @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  defaultOwner   User?                    @relation(fields: [defaultOwnerId], references: [id])
+  sourceRow      ImportedChecklistRow?    @relation(fields: [sourceRowId], references: [id])
+  mappings       ControlMapping[]
+  assignments    AssessmentAssignment[]
+  responses      AssessmentResponse[]
+  evidence       Evidence[]
+  reviews        AuditorReview[]
+  comments       ReviewComment[]
+  findings       Finding[]
+  reviewComments ChecklistReviewComment[]
+
+  @@unique([versionId, questionCode])
+  @@index([versionId, sequence])
+}
+
+/// Reviewer comments on a checklist version (optionally on one question). The author resolves them in draft.
+model ChecklistReviewComment {
+  id           String    @id @default(uuid())
+  versionId    String
+  itemId       String?
+  authorId     String
+  body         String
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime  @default(now())
+
+  version ChecklistVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  item    ChecklistItem?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([versionId])
+}
+
+model ControlMapping {
+  id          String      @id @default(uuid())
+  itemId      String
+  type        MappingType
+  reference   String // "8.15", "9.1", "POL-IT-004", "RISK-012"
+  title       String?
+  needsReview Boolean     @default(false) // import produced an ambiguous mapping
+  createdAt   DateTime    @default(now())
+
+  item ChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, type, reference])
+  @@index([type, reference])
+}
+
+// ─────────────────────── Excel import ───────────────────────
+
+model ImportedChecklist {
+  id             String       @id @default(uuid())
+  organisationId String
+  fileName       String
+  checksum       String
+  fileSize       Int
+  storageKey     String?
+  status         ImportStatus @default(PREVIEW)
+  sheetSummary   Json // per-sheet detected headers, column mapping and counts
+  errorSummary   Json?
+  uploadedById   String
+  confirmedById  String?
+  confirmedAt    DateTime?
+  createdAt      DateTime     @default(now())
+
+  organisation Organisation           @relation(fields: [organisationId], references: [id])
+  rows         ImportedChecklistRow[]
+  versions     ChecklistVersion[]
+
+  @@index([organisationId, checksum])
+}
+
+/// One worksheet row, with every original cell preserved verbatim in rawData.
+model ImportedChecklistRow {
+  id               String  @id @default(uuid())
+  importId         String
+  sheetName        String
+  rowNumber        Int
+  serialNo         String?
+  rawData          Json // { "<original header>": "<original value>" }
+  mapped           Json // normalised fields used to build checklist items
+  validationErrors Json    @default("[]")
+  warnings         Json    @default("[]")
+  isDuplicate      Boolean @default(false)
+  included         Boolean @default(true)
+
+  import ImportedChecklist @relation(fields: [importId], references: [id], onDelete: Cascade)
+  item   ChecklistItem?
+
+  @@unique([importId, sheetName, rowNumber])
+}
+
+// ─────────────────────── Assessments ───────────────────────
+
+model ScoringPolicy {
+  id                   String    @id @default(uuid())
+  organisationId       String
+  version              Int
+  name                 String
+  weightCompliant      Float     @default(1)
+  weightPartial        Float     @default(0.5)
+  weightNonCompliant   Float     @default(0)
+  excludeNotApplicable Boolean   @default(true)
+  excludeNotAssessed   Boolean   @default(false)
+  isActive             Boolean   @default(false)
+  approvedById         String?
+  approvedAt           DateTime?
+  notes                String?
+  createdAt            DateTime  @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  assessments  Assessment[]
+
+  @@unique([organisationId, version])
+}
+
+model Assessment {
+  id                 String           @id @default(uuid())
+  code               String           @unique
+  organisationId     String
+  siteId             String
+  departmentId       String
+  checklistVersionId String
+  scoringPolicyId    String
+  title              String
+  periodLabel        String // e.g. "Q3 FY2026-27"
+  periodStart        DateTime
+  periodEnd          DateTime
+  startDate          DateTime
+  dueDate            DateTime
+  scope              String?
+  status             AssessmentStatus @default(DRAFT)
+  approvalRequired   Boolean          @default(true)
+  round              Int              @default(1)
+  ownerId            String
+  createdById        String
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  reopenCount        Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  organisation     Organisation           @relation(fields: [organisationId], references: [id])
+  site             Site                   @relation(fields: [siteId], references: [id])
+  department       Department             @relation(fields: [departmentId], references: [id])
+  checklistVersion ChecklistVersion       @relation(fields: [checklistVersionId], references: [id])
+  scoringPolicy    ScoringPolicy          @relation(fields: [scoringPolicyId], references: [id])
+  owner            User                   @relation("AssessmentOwner", fields: [ownerId], references: [id])
+  createdBy        User                   @relation("AssessmentCreator", fields: [createdById], references: [id])
+  assignments      AssessmentAssignment[]
+  responses        AssessmentResponse[]
+  submissions      AssessmentSubmission[]
+  evidence         Evidence[]
+  reviews          AuditorReview[]
+  comments         ReviewComment[]
+  findings         Finding[]
+  approvals        Approval[]
+  reports          Report[]
+
+  @@index([organisationId, siteId, departmentId])
+  @@index([status])
+  @@index([periodStart])
+}
+
+model AssessmentAssignment {
+  id           String    @id @default(uuid())
+  assessmentId String
+  itemId       String
+  assigneeId   String
+  assignedById String
+  dueDate      DateTime?
+  assignedAt   DateTime  @default(now())
+
+  assessment Assessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  item       ChecklistItem @relation(fields: [itemId], references: [id])
+  assignee   User          @relation("Assignee", fields: [assigneeId], references: [id])
+
+  @@unique([assessmentId, itemId])
+  @@index([assigneeId])
+}
+
+model AssessmentResponse {
+  id            String         @id @default(uuid())
+  assessmentId  String
+  itemId        String
+  status        ResponseStatus @default(NOT_ASSESSED)
+  comment       String?
+  justification String?
+  responderId   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  assessment Assessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  item       ChecklistItem @relation(fields: [itemId], references: [id])
+  responder  User?         @relation(fields: [responderId], references: [id])
+  evidence   Evidence[]
+
+  @@unique([assessmentId, itemId])
+}
+
+/// Immutable snapshot taken at every submission so prior rounds remain inspectable.
+model AssessmentSubmission {
+  id            String   @id @default(uuid())
+  assessmentId  String
+  round         Int
+  submittedById String
+  snapshot      Json
+  createdAt     DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, round])
+}
+
+/// Lifecycle transitions (assessment, finding, corrective action, checklist version) with actor and reason.
+model StatusHistory {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  fromStatus String?
+  toStatus   String
+  actorId    String?
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// ─────────────────────── Evidence ───────────────────────
+
+model Evidence {
+  id                 String                 @id @default(uuid())
+  code               String                 @unique
+  organisationId     String
+  siteId             String
+  departmentId       String
+  assessmentId       String?
+  itemId             String?
+  responseId         String?
+  findingId          String?
+  correctiveActionId String?
+  title              String
+  description        String?
+  classification     EvidenceClassification @default(INTERNAL)
+  currentVersion     Int                    @default(1)
+  verificationStatus EvidenceVerification   @default(PENDING)
+  verificationNote   String?
+  verifiedById       String?
+  verifiedAt         DateTime?
+  uploaderId         String
+  retentionUntil     DateTime?
+  archivedAt         DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  organisation     Organisation        @relation(fields: [organisationId], references: [id])
+  site             Site                @relation(fields: [siteId], references: [id])
+  department       Department          @relation(fields: [departmentId], references: [id])
+  assessment       Assessment?         @relation(fields: [assessmentId], references: [id])
+  item             ChecklistItem?      @relation(fields: [itemId], references: [id])
+  response         AssessmentResponse? @relation(fields: [responseId], references: [id])
+  finding          Finding?            @relation(fields: [findingId], references: [id])
+  correctiveAction CorrectiveAction?   @relation(fields: [correctiveActionId], references: [id])
+  uploader         User                @relation(fields: [uploaderId], references: [id])
+  versions         EvidenceVersion[]
+  reviews          AuditorReview[]
+
+  @@index([organisationId, siteId, departmentId])
+  @@index([assessmentId, itemId])
+  @@index([findingId])
+}
+
+model EvidenceVersion {
+  id               String     @id @default(uuid())
+  evidenceId       String
+  version          Int
+  originalFilename String
+  storageKey       String     @unique
+  mimeType         String
+  size             Int
+  checksum         String // SHA-256 hex
+  scanStatus       ScanStatus @default(PENDING)
+  scanDetail       String?
+  uploaderId       String
+  uploadedAt       DateTime   @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  uploader User     @relation(fields: [uploaderId], references: [id])
+
+  @@unique([evidenceId, version])
+}
+
+// ─────────────────────── Audit review & findings ───────────────────────
+
+model AuditorReview {
+  id           String         @id @default(uuid())
+  assessmentId String
+  itemId       String?
+  evidenceId   String?
+  auditorId    String
+  decision     ReviewDecision
+  reason       String?
+  comments     String?
+  round        Int
+  resolvedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  assessment Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  item       ChecklistItem? @relation(fields: [itemId], references: [id])
+  evidence   Evidence?      @relation(fields: [evidenceId], references: [id])
+  auditor    User           @relation(fields: [auditorId], references: [id])
+
+  @@index([assessmentId, itemId])
+}
+
+model ReviewComment {
+  id           String   @id @default(uuid())
+  assessmentId String?
+  itemId       String?
+  findingId    String?
+  authorId     String
+  body         String
+  createdAt    DateTime @default(now())
+
+  assessment Assessment?    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  item       ChecklistItem? @relation(fields: [itemId], references: [id])
+  finding    Finding?       @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  author     User           @relation(fields: [authorId], references: [id])
+
+  @@index([assessmentId, itemId])
+}
+
+model Finding {
+  id                    String          @id @default(uuid())
+  code                  String          @unique
+  organisationId        String
+  siteId                String
+  departmentId          String
+  assessmentId          String
+  itemId                String?
+  category              FindingCategory
+  severity              Severity
+  title                 String
+  description           String
+  auditorComments       String?
+  ownerId               String?
+  raisedById            String
+  dueDate               DateTime
+  status                FindingStatus   @default(OPEN)
+  closureRecommendation String?
+  closedAt              DateTime?
+  closedById            String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  organisation Organisation       @relation(fields: [organisationId], references: [id])
+  site         Site               @relation(fields: [siteId], references: [id])
+  department   Department         @relation(fields: [departmentId], references: [id])
+  assessment   Assessment         @relation(fields: [assessmentId], references: [id])
+  item         ChecklistItem?     @relation(fields: [itemId], references: [id])
+  owner        User?              @relation("FindingOwner", fields: [ownerId], references: [id])
+  raisedBy     User               @relation("FindingRaiser", fields: [raisedById], references: [id])
+  actions      CorrectiveAction[]
+  evidence     Evidence[]
+  comments     ReviewComment[]
+
+  @@index([organisationId, siteId])
+  @@index([status, severity])
+}
+
+model CorrectiveAction {
+  id                  String       @id @default(uuid())
+  code                String       @unique
+  findingId           String
+  rootCause           String?
+  immediateCorrection String?
+  correctiveAction    String
+  ownerId             String
+  targetDate          DateTime
+  status              ActionStatus @default(PLANNED)
+  progressPercent     Int          @default(0)
+  closureNotes        String?
+  verifiedById        String?
+  verifiedAt          DateTime?
+  verificationComment String?
+  createdById         String
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  finding  Finding                  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  owner    User                     @relation("ActionOwner", fields: [ownerId], references: [id])
+  updates  CorrectiveActionUpdate[]
+  evidence Evidence[]
+
+  @@index([ownerId])
+  @@index([status, targetDate])
+}
+
+model CorrectiveActionUpdate {
+  id              String   @id @default(uuid())
+  actionId        String
+  authorId        String
+  note            String
+  progressPercent Int?
+  createdAt       DateTime @default(now())
+
+  action CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  author User             @relation(fields: [authorId], references: [id])
+}
+
+model Approval {
+  id           String           @id @default(uuid())
+  assessmentId String
+  approverId   String
+  decision     ApprovalDecision
+  comments     String?
+  round        Int
+  createdAt    DateTime         @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  approver   User       @relation(fields: [approverId], references: [id])
+}
+
+// ─────────────────────── Reports ───────────────────────
+
+/// Final reports are immutable once generated; a re-approval creates a new version.
+model Report {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  organisationId String
+  siteId         String
+  departmentId   String
+  assessmentId   String
+  version        Int
+  title          String
+  storageKey     String    @unique
+  checksum       String
+  size           Int
+  approvalStatus String    @default("APPROVED")
+  summary        Json // frozen metrics at generation time
+  generatedById  String
+  generatedAt    DateTime  @default(now())
+  retentionUntil DateTime?
+  archivedAt     DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  site         Site         @relation(fields: [siteId], references: [id])
+  department   Department   @relation(fields: [departmentId], references: [id])
+  assessment   Assessment   @relation(fields: [assessmentId], references: [id])
+  generatedBy  User         @relation(fields: [generatedById], references: [id])
+
+  @@unique([assessmentId, version])
+  @@index([organisationId, siteId])
+}
+
+// ─────────────────────── Audit, notifications, admin ───────────────────────
+
+/// Append-only (UPDATE/DELETE blocked by trigger) and hash-chained for tamper evidence.
+model AuditEvent {
+  id             String       @id @default(uuid())
+  seq            Int          @unique @default(autoincrement())
+  actorId        String?
+  actorEmail     String?
+  action         String
+  entityType     String
+  entityId       String?
+  outcome        AuditOutcome
+  organisationId String?
+  siteId         String?
+  ip             String?
+  userAgent      String?
+  metadata       Json?
+  prevHash       String?
+  hash           String
+  createdAt      DateTime     @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model Notification {
+  id          String         @id @default(uuid())
+  userId      String
+  type        String
+  title       String
+  body        String
+  link        String?
+  readAt      DateTime?
+  emailStatus DeliveryStatus @default(PENDING)
+  emailError  String?
+  createdAt   DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model RetentionPolicy {
+  id             String          @id @default(uuid())
+  organisationId String
+  entityType     RetentionEntity
+  retentionDays  Int
+  action         RetentionAction
+  isActive       Boolean         @default(true)
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+
+  @@unique([organisationId, entityType])
+}
+
+/// Secure deletion is a two-person workflow: request → approve → execute.
+model DeletionRequest {
+  id            String         @id @default(uuid())
+  entityType    String
+  entityId      String
+  reason        String
+  status        DeletionStatus @default(PENDING)
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  executedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([status])
+}
+
+model AssessmentSchedule {
+  id                  String            @id @default(uuid())
+  organisationId      String
+  siteId              String
+  departmentId        String
+  checklistTemplateId String
+  frequency           ScheduleFrequency
+  nextRunDate         DateTime
+  durationDays        Int               @default(30)
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id])
+  site         Site              @relation(fields: [siteId], references: [id])
+  department   Department        @relation(fields: [departmentId], references: [id])
+  template     ChecklistTemplate @relation(fields: [checklistTemplateId], references: [id])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

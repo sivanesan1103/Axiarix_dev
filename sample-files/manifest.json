@@ -1,0 +1,248 @@
+[
+  {
+    "folder": "01-organisation-setup",
+    "file": "sunrise-care-organisation-setup.xlsx",
+    "what": "Sunrise Care (Sample): 3 branches, 5 departments, 14 users, 3 restricted users",
+    "use": "Organisations → New organisation → Load setup workbook (already created on this machine, so the wizard will report it as a duplicate)"
+  },
+  {
+    "folder": "01-organisation-setup",
+    "file": "meridian-diagnostics-organisation-setup.xlsx",
+    "what": "Second fictitious organisation: 2 branches, 4 departments, 9 users (1 restricted)",
+    "use": "Organisations → New organisation → Load setup workbook → creates a fresh organisation"
+  },
+  {
+    "folder": "01-organisation-setup",
+    "file": "blank-organisation-setup-template.xlsx",
+    "what": "Empty template with the four sheets and headers",
+    "use": "Fill in for a real onboarding"
+  },
+  {
+    "folder": "02-checklists",
+    "file": "it-and-biomedical-ia-checklist.xlsx",
+    "what": "Two sheets: IT – IA Checklist (28 questions) and Biomedical – IA Checklist (8)",
+    "use": "Checklist Library → Import from Excel (question 4 is flagged on purpose)"
+  },
+  {
+    "folder": "02-checklists",
+    "file": "hr-information-security-checklist.xlsx",
+    "what": "HR checklist, 12 questions (Annex A people controls 6.1–6.8)",
+    "use": "Checklist Library → Import from Excel"
+  },
+  {
+    "folder": "02-checklists",
+    "file": "physical-environmental-security-checklist.xlsx",
+    "what": "Physical & environmental checklist, 10 questions (Annex A 7.x)",
+    "use": "Checklist Library → Import from Excel"
+  },
+  {
+    "folder": "02-checklists",
+    "file": "blank-checklist-template.xlsx",
+    "what": "Empty checklist in the importer layout (title rows 2–4, headers on row 6)",
+    "use": "Copy, add questions from row 7, import"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-001_Information-Security-Policy-v3.pdf",
+    "what": "Approved information security policy v3",
+    "use": "Evidence for IA-001 (A.5.1, clauses 5.2, 7.4)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-002_ISMS-RACI-Matrix.xlsx",
+    "what": "RACI matrix showing segregation of duties",
+    "use": "Evidence for IA-002 (A.5.2, A.5.3)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-003_Risk-Register-and-Treatment-Plan-FY2026-27.xlsx",
+    "what": "Risk register with likelihood × impact scores and treatment",
+    "use": "Evidence for IA-003 (clauses 6.1, 8.2, 8.3)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-004_Statement-of-Applicability-v2.xlsx",
+    "what": "SoA extract with applicability and justifications",
+    "use": "Evidence for IA-004 (clause 6.1)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-005_IT-Asset-Inventory-Oct-2026.xlsx",
+    "what": "Asset inventory with owners and classification",
+    "use": "Evidence for IA-005 (A.5.9, A.5.10)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-006_Information-Classification-Procedure.docx",
+    "what": "Classification and labelling procedure (Word)",
+    "use": "Evidence for IA-006 (A.5.12, A.5.13)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-007_User-Access-Review-Q3-FY2026-27.xlsx",
+    "what": "Quarterly access review with decisions",
+    "use": "Evidence for IA-007 (A.5.15, A.5.18, A.8.2)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-008_Joiner-Mover-Leaver-Log-Q3.csv",
+    "what": "Joiner/mover/leaver log with SLA tracking (CSV)",
+    "use": "Evidence for IA-008 (A.5.16, A.6.5)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-009_MFA-Configuration-Report.pdf",
+    "what": "MFA and password settings report",
+    "use": "Evidence for IA-009 (A.5.17, A.8.5)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-010_Supplier-Security-Assessment-HIS-Vendor.pdf",
+    "what": "Vendor risk assessment",
+    "use": "Evidence for IA-010 (A.5.19, A.5.20, A.5.22)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-011_Cloud-Services-Register.xlsx",
+    "what": "Register of approved cloud services",
+    "use": "Evidence for IA-011 (A.5.23)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-012_Incident-Register-Q3-FY2026-27.xlsx",
+    "what": "Incident register with lessons learned",
+    "use": "Evidence for IA-012 (A.5.24, A.5.26, A.5.27)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-013_DR-Drill-Report-Sep-2026.pdf",
+    "what": "DR drill results against RTO/RPO",
+    "use": "Evidence for IA-013 (A.5.29, A.5.30)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-014_Legal-and-Regulatory-Register.xlsx",
+    "what": "Register of legal and regulatory obligations",
+    "use": "Evidence for IA-014 (A.5.31, A.5.34)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-015_Security-Awareness-Training-Records.csv",
+    "what": "Training completion records (CSV)",
+    "use": "Evidence for IA-015 (A.6.3)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-016_NDA-Register.xlsx",
+    "what": "NDA register",
+    "use": "Evidence for IA-016 (A.6.6)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-017_Data-Centre-Access-Log-Oct-2026.csv",
+    "what": "Data centre access log (CSV)",
+    "use": "Evidence for IA-017 (A.7.1, A.7.2, A.7.4)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-018_UPS-and-Cooling-Maintenance-Report.pdf",
+    "what": "Utilities and environmental maintenance report",
+    "use": "Evidence for IA-018 (A.7.5, A.7.11, A.7.13)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-019_Media-Disposal-Certificates.xlsx",
+    "what": "Media disposal register",
+    "use": "Evidence for IA-019 (A.7.10, A.7.14)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-020_Endpoint-Protection-Coverage-Report.pdf",
+    "what": "AV/EDR coverage report",
+    "use": "Evidence for IA-020 (A.8.1, A.8.7)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-021_Patch-Compliance-Report-Oct-2026.xlsx",
+    "what": "Patch compliance by device group",
+    "use": "Evidence for IA-021 (A.8.8, A.8.19)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-022_Backup-Restore-Test-Record-Q3.pdf",
+    "what": "Backup schedule and quarterly restore test sign-off",
+    "use": "Evidence for IA-022 (A.8.13) – the walkthrough also uses sample-org/sample-evidence.pdf"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-023_SIEM-Log-Review-Oct-2026.pdf",
+    "what": "Monthly log review summary",
+    "use": "Evidence for IA-023 (A.8.15, A.8.16, A.8.17)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-024_Network-Diagram-v4.png",
+    "what": "Network diagram with VLAN segmentation (PNG)",
+    "use": "Evidence for IA-024 (A.8.20, A.8.21, A.8.22)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-025_Change-Register-Q3.xlsx",
+    "what": "Change register with CAB approvals",
+    "use": "Evidence for IA-025 (A.8.32)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-026_Internal-Audit-Programme-FY2026-27.docx",
+    "what": "Annual internal audit programme (Word)",
+    "use": "Evidence for IA-026 (clause 9.2, A.5.35)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-027_Management-Review-Minutes-Oct-2026.docx",
+    "what": "Management review minutes (Word)",
+    "use": "Evidence for IA-027 (clause 9.3)"
+  },
+  {
+    "folder": "03-evidence",
+    "file": "IA-028_Nonconformity-and-Corrective-Action-Register.xlsx",
+    "what": "NC and corrective action register",
+    "use": "Evidence for IA-028 (clause 10.2)"
+  },
+  {
+    "folder": "04-corrective-action-evidence",
+    "file": "DR-Plan-v2-with-file-server-restore.pdf",
+    "what": "Updated DR plan closing the file-server observation",
+    "use": "Closure evidence for a corrective action (e.g. CA from finding \"DR plan lacks file-server restore\")"
+  },
+  {
+    "folder": "04-corrective-action-evidence",
+    "file": "Access-Review-Remediation-Nov-2026.xlsx",
+    "what": "Remediation log after the Q3 access review",
+    "use": "Closure evidence for an access-control corrective action"
+  },
+  {
+    "folder": "04-corrective-action-evidence",
+    "file": "Phishing-Simulation-Results-Nov-2026.pdf",
+    "what": "Phishing simulation report",
+    "use": "Closure evidence for an awareness corrective action"
+  },
+  {
+    "folder": "05-upload-rejection-tests",
+    "file": "disguised-html-as.pdf",
+    "what": "HTML content with a .pdf name",
+    "use": "Upload as evidence → expect refusal (file content does not match .pdf)"
+  },
+  {
+    "folder": "05-upload-rejection-tests",
+    "file": "notes-unsupported-type.txt",
+    "what": "Plain text file",
+    "use": "Upload as evidence → expect refusal (type not allowed)"
+  },
+  {
+    "folder": "05-upload-rejection-tests",
+    "file": "empty-file.csv",
+    "what": "Zero-byte CSV",
+    "use": "Upload as evidence → expect refusal (empty file)"
+  }
+]

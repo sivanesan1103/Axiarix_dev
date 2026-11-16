@@ -1,0 +1,6 @@
+Date,Employee ID,Event,Department,Systems,Account action,Completed within SLA
+2026-10-03,E10231,Joiner,Nursing,HIS; e-mail,Created,Yes
+2026-10-11,E09874,Mover,Billing → Finance,HIS billing; ERP,Billing role removed; ERP added,Yes
+2026-10-20,E08812,Leaver,Radiology,PACS; HIS; e-mail,Disabled,Yes
+2026-11-02,E10302,Joiner,IT,AD; VPN,Created,Yes
+2026-11-09,E07740,Leaver,Pharmacy,HIS pharmacy,Disabled (1 day late),No

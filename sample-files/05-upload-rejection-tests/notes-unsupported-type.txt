@@ -1,0 +1,1 @@
+Plain-text file. .txt is not on the evidence allow-list.
