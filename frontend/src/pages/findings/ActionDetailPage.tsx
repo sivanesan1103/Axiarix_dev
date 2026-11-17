@@ -80,7 +80,7 @@ export function ActionDetailPage() {
       />
       <SodNotice messages={[a.blocked?.verify]} />
       {a.status === 'RETURNED' && a.verificationComment && <p className="rounded-lg border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad">Returned by auditor: {a.verificationComment}</p>}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
         <div className="space-y-6">
           <Card>
             <CardBody className="pt-5">

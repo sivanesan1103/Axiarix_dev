@@ -50,17 +50,31 @@ export function EmptyState({ title, description, action, icon: Icon = Inbox, cla
 }
 
 export function ErrorState({ error, onRetry, className }: { error: unknown; onRetry?: () => void; className?: string }) {
+  // Permission refusals and missing records are final: say so plainly and offer a way back, not "Try again".
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  const final = status === 403 || status === 404;
+  const title = status === 403 ? 'You do not have access to this' : status === 404 ? 'Not found' : 'Could not load this data';
+  const hint = status === 403 ? ' If you need it, ask your administrator or the record owner.' : status === 404 ? ' It may have been removed, or the link is wrong.' : '';
   return (
     <div className={cn('flex flex-col items-center justify-center px-6 py-12 text-center', className)} role="alert">
-      <div className="mb-3 flex size-11 items-center justify-center rounded-full bg-bad-soft text-bad">
+      <div className={cn('mb-3 flex size-11 items-center justify-center rounded-full', final ? 'bg-muted-bg text-muted' : 'bg-bad-soft text-bad')}>
         <AlertTriangle className="size-5" />
       </div>
-      <p className="text-sm font-semibold">Could not load this data</p>
-      <p className="mt-1 max-w-md text-[13px] text-muted">{errorMessage(error)}</p>
-      {onRetry && (
-        <Button size="sm" className="mt-4" onClick={onRetry}>
-          Try again
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mt-1 max-w-md text-[13px] text-muted">
+        {errorMessage(error)}
+        {hint}
+      </p>
+      {final ? (
+        <Button size="sm" className="mt-4" onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/'))}>
+          Go back
         </Button>
+      ) : (
+        onRetry && (
+          <Button size="sm" className="mt-4" onClick={onRetry}>
+            Try again
+          </Button>
+        )
       )}
     </div>
   );

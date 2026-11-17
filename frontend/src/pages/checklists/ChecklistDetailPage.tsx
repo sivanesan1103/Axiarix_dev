@@ -49,7 +49,7 @@ export function ChecklistDetailPage() {
           )
         }
       />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
         <Card>
           <CardHeader title="Versions" description="Assessments keep the exact version they were created from." />
           <Table>

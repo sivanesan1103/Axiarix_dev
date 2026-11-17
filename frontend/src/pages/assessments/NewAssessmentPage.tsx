@@ -73,7 +73,7 @@ export function NewAssessmentPage() {
   return (
     <div>
       <PageHeader back={{ to: '/assessments', label: 'Assessment Periods' }} title="New assessment" description="The selected checklist version and the active scoring policy are pinned to this assessment." />
-      <form onSubmit={form.handleSubmit((v) => m.mutate(v))} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <form onSubmit={form.handleSubmit((v) => m.mutate(v))} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
         <Card>
           <CardHeader title="Scope" />
           <CardBody className="grid gap-4 sm:grid-cols-2">

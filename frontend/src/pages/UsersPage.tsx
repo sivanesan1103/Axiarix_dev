@@ -417,7 +417,7 @@ function RolesTab() {
   if (roles.isLoading || perms.isLoading) return <Card><LoadingRows /></Card>;
   if (roles.isError) return <ErrorState error={roles.error} onRetry={() => roles.refetch()} />;
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)] [&>*]:min-w-0">
       <Card className="p-2">
         {roles.data!.map((r) => (
           <button key={r.id} onClick={() => setRoleId(r.id)} className={`w-full rounded-md px-3 py-2.5 text-left ${role?.id === r.id ? 'bg-brand-soft' : 'hover:bg-subtle'}`}>
