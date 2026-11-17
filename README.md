@@ -74,7 +74,7 @@ The seed imports both worksheets of `backend/source-data/kauvery-vadapalani-it-i
 - **Periods** are fixed formats on the Indian financial year: `Q3 FY2026-27`, `H1 FY2026-27`, `FY2026-27`. Dates are derived from the label.
 - **Filters:** the *Scope* button in the top bar (branch · period) applies to the dashboard and every list. List filters are kept in the page link, so refresh, Back and shared links keep the same view.
 
-See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* organisation and checklist workbooks.
+See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* organisation and checklist workbooks, and `docs/DEMO_WALKTHROUGH.md` for *Green Valley Clinic (Demo)*, a one-person-per-role organisation for walking the whole workflow in Chrome.
 
 ### Try the full workflow
 

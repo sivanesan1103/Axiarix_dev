@@ -17,6 +17,7 @@ This guide covers the version running locally on 16 November 2026, including the
 | Axiarix Platform | Internal organisation that holds the platform owner. No audit data. | `platform@axiarix.local` |
 | Kauvery Hospitals Group | The pilot hospital. Branches Vadapalani (KVP) and Alwarpet (demo branch, KAL-DEMO). Real checklist workbook imported. | 7 demo accounts `@axiarix.local` |
 | Sunrise Care Hospitals (Sample) | A fictitious organisation created from `sample-org/` with the new-organisation wizard. 3 branches, 5 departments, 14 users. | 14 accounts `@sunrise-sample.example.org` |
+| Green Valley Clinic (Demo) | The smallest demo: one branch (Main Branch, GVC-MAIN), one IT department and one person per role. Made to walk the whole workflow one person at a time. Steps and logins: `docs/DEMO_WALKTHROUGH.md`. | 6 accounts `@greenvalley-demo.example.org` |
 
 A fourth organisation, **Meridian Diagnostics (Sample)** (2 branches, 4 departments, 9 users), was created with the wizard on 16 November 2026. Its logins are in *Onboarding run: Meridian Diagnostics (Sample)* below, and the recordings are in `docs/demo/meridian-create-organisation.gif` and `docs/demo/meridian-admin-accepts-invite-and-signs-in.gif`.
 
@@ -76,8 +77,8 @@ Three Sunrise accounts have a password so far: admin@, branchadmin.north@ and au
 
 ### First sign-in for invited users
 
-1. Open Mailpit at http://localhost:8025 and find the "Reset your Axiarix password" e-mail for the user.
-2. Click the link in it. It opens the app's *Set a new password* page.
+1. Open Mailpit at http://localhost:8025 and find the "You have been invited" e-mail for the user.
+2. Click the link in it. It opens the app's *Welcome – set your password* page.
 3. Enter a password of at least 12 characters with an upper-case letter, a lower-case letter and a digit, twice, and save.
 4. Sign in at http://localhost:5174.
 
@@ -254,7 +255,7 @@ An administrator works through **Admin Home** top to bottom: branches, departmen
 
 1. Open **Users & Access Control** and click **Invite user**.
 2. Enter name, e-mail and designation. Under *Roles & scope*, pick a role and, to limit it, a site and department. **Add role** gives the same person a second role.
-3. Keep *E-mail a set-password link* on. The person receives an invitation (in Mailpit locally).
+3. Keep *E-mail a set-password link* on. The person receives a welcome e-mail (in Mailpit locally) with a link to set their own password. Or turn it off and type a *Starting password* (at least 12 characters with upper-case, lower-case and a digit), then give it to the person yourself. Until someone signs in for the first time, the user list shows them as *Invited*.
 4. To change someone later, open the ⋯ menu on their row: **Edit details & roles**, **Restrict permissions**, or **Deactivate** (needs a reason; sessions end immediately).
 
 The ⋯ menu only appears for people you are allowed to manage. Your own row shows *You*: nobody can change their own roles or restrictions.
