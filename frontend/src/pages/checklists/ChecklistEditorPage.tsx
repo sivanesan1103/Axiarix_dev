@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -125,23 +125,29 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
     setPrevItem(item);
     setMappings(initialMappings);
   }
-  const form = useForm<ItemForm>({
-    resolver: zodResolver(itemSchema),
-    values: {
-      question: item?.question ?? '',
-      description: item?.description ?? '',
-      guidance: item?.guidance ?? '',
-      internalPolicyRef: item?.internalPolicyRef ?? '',
-      riskRef: item?.riskRef ?? '',
-      evidenceRequirement: item?.evidenceRequirement ?? '',
-      evidenceMandatory: item?.evidenceMandatory ?? true,
-      responseMandatory: item?.responseMandatory ?? true,
-      defaultOwnerId: item?.defaultOwnerId ?? '',
-      priority: item?.priority ?? 'MEDIUM',
-      category: item?.category ?? '',
-      status: item?.status ?? 'ACTIVE',
-    },
+  const itemDefaults = (): ItemForm => ({
+    question: item?.question ?? '',
+    description: item?.description ?? '',
+    guidance: item?.guidance ?? '',
+    internalPolicyRef: item?.internalPolicyRef ?? '',
+    riskRef: item?.riskRef ?? '',
+    evidenceRequirement: item?.evidenceRequirement ?? '',
+    evidenceMandatory: item?.evidenceMandatory ?? true,
+    responseMandatory: item?.responseMandatory ?? true,
+    defaultOwnerId: item?.defaultOwnerId ?? '',
+    priority: item?.priority ?? 'MEDIUM',
+    category: item?.category ?? '',
+    status: item?.status ?? 'ACTIVE',
   });
+  const form = useForm<ItemForm>({ resolver: zodResolver(itemSchema), defaultValues: itemDefaults() });
+  // Every opening starts from the question being edited, or from a blank form for a new question
+  // (previously "Add question" reopened with the last question's text and mappings).
+  useEffect(() => {
+    if (!open) return;
+    form.reset(itemDefaults());
+    setMappings(initialMappings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
   const m = useMutation({
     mutationFn: async (v: ItemForm) => {
       const body = { ...v, defaultOwnerId: v.defaultOwnerId || null, description: v.description || null, guidance: v.guidance || null, internalPolicyRef: v.internalPolicyRef || null, riskRef: v.riskRef || null, evidenceRequirement: v.evidenceRequirement || null, category: v.category || null };

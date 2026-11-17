@@ -81,7 +81,7 @@ Three Sunrise accounts have a password so far: admin@, branchadmin.north@ and au
 3. Enter a password of at least 12 characters with an upper-case letter, a lower-case letter and a digit, twice, and save.
 4. Sign in at http://localhost:5174.
 
-Links expire 30 minutes after they are sent. If one has expired, use *Forgot password?* on the sign-in page and a fresh e-mail arrives in Mailpit.
+Invitation links (new accounts) open a *Welcome – set your password* page and expire 72 hours after they are sent; password-reset links expire after 30 minutes. If one has expired, use *Forgot password?* on the sign-in page and a fresh e-mail arrives in Mailpit.
 
 Five wrong passwords in a row lock an account for 15 minutes.
 
@@ -540,7 +540,7 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | Upload refused | Wrong type, over the size limit, disguised or flagged as malware | Upload a clean PDF, DOCX, XLSX, CSV, PNG or JPG under the limit |
 | *Use a period such as "Q3 FY2026-27"* | Period not in a fixed format | Use the period pickers on New assessment |
 | A list looks empty | A top-bar scope or a page filter is active | Look at the *Filtered by* row and click *Clear all* |
-| Invitation link doesn't work | Links expire after 30 minutes | Use *Forgot password?* to send a fresh one |
+| Invitation link doesn't work | Invitations expire after 72 hours (reset links after 30 minutes) | Use *Forgot password?* to send a fresh one |
 | Red warning: the owner *has no access* to the assessment | The owner works in another department | An ISMS owner or administrator clicks **Change owner** |
 | A person is missing from an assignee or owner list | Lists only show people from the record's branch and department | Give the person a role in that department, or pick someone who works there |
 | **Submit review** is greyed out | Some answers or files have no decision yet | Click each question listed in the dialog and decide it |

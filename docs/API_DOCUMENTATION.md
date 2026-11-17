@@ -14,7 +14,7 @@
 | POST | `/auth/login` | `{ email, password, mfaCode? }` → `{ accessToken, user }` or `{ mfaRequired: true }`; sets refresh cookie |
 | POST | `/auth/refresh` | Rotates the refresh token; reuse revokes the family |
 | POST | `/auth/logout` | Revokes the token family |
-| POST | `/auth/forgot-password` · `/auth/reset-password` | 30-minute single-use reset token by e-mail |
+| POST | `/auth/forgot-password` · `/auth/reset-password` | 30-minute single-use reset token by e-mail (invitations: 72 hours, `&invite=1` link, audited as `USER_INVITED`) |
 | GET | `/auth/me` | Profile, roles, permissions, scopes, active restrictions and the organisation's display `timeZone` (also returned by login and refresh) |
 | POST | `/auth/change-password` | |
 | POST | `/auth/mfa/setup` · `/auth/mfa/enable` · `/auth/mfa/disable` | TOTP |
@@ -40,7 +40,7 @@
 | POST/PATCH | `/organisations/departments[/:id]` | organisation:create / update |
 | GET | `/users?search&role&status&siteId` | user:read |
 | GET | `/users/directory?role=` | any authenticated user (pickers) |
-| POST | `/users` | user:create (invite e-mail or initial password) |
+| POST | `/users` | user:create (invitation e-mail with a 72-hour set-password link, or `sendInvite: false` with a starting `password`) |
 | PATCH | `/users/:id` | user:update |
 | POST | `/users/:id/status` | user:update – `{ status, reason }`, revokes sessions on deactivation |
 | PUT | `/users/:id/roles` | role:assign – role and scope assignments (branch administrators only inside their branch; nobody changes their own access) |

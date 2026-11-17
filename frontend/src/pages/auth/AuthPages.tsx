@@ -174,18 +174,25 @@ export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get('token') ?? '';
+  // Invitation links (new accounts) set a first password; other links reset a forgotten one.
+  const invite = params.get('invite') === '1';
   const form = useForm<z.infer<typeof resetSchema>>({ resolver: zodResolver(resetSchema), defaultValues: { password: '', confirm: '' } });
   return (
-    <AuthShell title="Choose a new password" subtitle="At least 12 characters with upper-case, lower-case and a digit.">
+    <AuthShell
+      title={invite ? 'Welcome – set your password' : 'Choose a new password'}
+      subtitle="At least 12 characters with upper-case, lower-case and a digit."
+    >
       {!token ? (
-        <p className="rounded-md bg-bad-soft px-3 py-2 text-sm text-bad">This reset link is missing its token. Request a new link.</p>
+        <p className="rounded-md bg-bad-soft px-3 py-2 text-sm text-bad">
+          This link is missing its token. {invite ? 'Ask your administrator to send a new invitation.' : 'Request a new link.'}
+        </p>
       ) : (
         <form
           className="space-y-4"
           onSubmit={form.handleSubmit(async (v) => {
             try {
               const r = await authService.resetPassword(token, v.password);
-              toast.success('Password updated. Please sign in.');
+              toast.success(invite ? 'Password set. Please sign in.' : 'Password updated. Please sign in.');
               // Pre-fill the e-mail via router state (kept out of the address bar and history).
               navigate('/login', { state: { email: r.email } });
             } catch (e) {
@@ -200,7 +207,7 @@ export function ResetPasswordPage() {
             <Input id="confirm" type="password" autoComplete="new-password" {...form.register('confirm')} />
           </Field>
           <Button type="submit" variant="primary" size="lg" className="w-full" loading={form.formState.isSubmitting}>
-            <KeyRound /> Update password
+            <KeyRound /> {invite ? 'Set password' : 'Update password'}
           </Button>
         </form>
       )}

@@ -161,7 +161,7 @@ usersRouter.post('/', requirePermission('user:create'), validate(createUserSchem
     select: userSelect,
   });
   await recordAudit({ req, action: 'USER_CREATED', entityType: 'User', entityId: user.id, metadata: { email: user.email, roles: body.roles.map((r) => r.roleKey) } });
-  if (body.sendInvite && !body.password) await forgotPassword(req, user.email);
+  if (body.sendInvite && !body.password) await forgotPassword(req, user.email, { invite: true });
   created(res, withManageFlag(req.user!, user));
 });
 

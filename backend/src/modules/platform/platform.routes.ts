@@ -191,7 +191,7 @@ platformRouter.post('/organisations', validate(createOrgSchema), async (req, res
   let invited = 0;
   if (input.sendInvites) {
     for (const email of result.userEmails) {
-      await forgotPassword(req, email);
+      await forgotPassword(req, email, { invite: true });
       invited++;
     }
   }
