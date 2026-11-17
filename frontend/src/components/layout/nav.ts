@@ -23,6 +23,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Visible when the user holds any of these permissions (empty = everyone). Matches the route guard. */
   any: string[];
+  /** Also requires one of these roles (e.g. department work is for department roles only). */
+  roles?: string[];
   group: 'platform' | 'programme' | 'audit' | 'admin' | 'account';
 }
 
@@ -44,7 +46,7 @@ export const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: BarChart3, any: ['dashboard:read'], group: 'programme' },
   { to: '/checklists', label: 'Checklist Library', icon: ListChecks, any: ['checklist:read'], group: 'programme' },
   { to: '/assessments', label: 'Assessment Periods', icon: CalendarRange, any: ['assessment:read'], group: 'programme' },
-  { to: '/my-assessments', label: 'My Assessments', icon: ClipboardCheck, any: ['response:update'], group: 'programme' },
+  { to: '/my-assessments', label: 'My Assessments', icon: ClipboardCheck, any: ['response:update'], roles: ['IT_OWNER', 'CONTRIBUTOR'], group: 'programme' },
   { to: '/evidence', label: 'Evidence Repository', icon: FolderLock, any: ['evidence:read'], group: 'programme' },
   { to: '/auditor', label: 'Auditor Workspace', icon: ShieldCheck, any: ['assessment:review'], group: 'audit' },
   { to: '/findings', label: 'Findings', icon: Siren, any: ['finding:read'], group: 'audit' },

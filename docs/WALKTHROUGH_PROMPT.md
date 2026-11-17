@@ -115,17 +115,17 @@ Records you will create get the next numbers. Expected: **ASM-2026-0004**, **FND
     Expect: line *Period Q3 FY2026-27 · 01 Oct 2026 – 31 Dec 2026*; owner auto-filled *Karthik Raman*.
 22. **Create assessment**.
     Expect: *ASM-2026-0004* created as *Draft*. Click **Assign to department** → **Assign**. Expect status *Assigned*.
-23. Sign in as **admin@axiarix.local**. Open **Assessment Periods** → *Walkthrough Q3 Backup Assessment* → **Open workspace**. On Q-001 choose **Compliant**, comment `Restore drill done 02 Nov`, **Save answer**.
-    Expect: status *In progress*. (The admin is now a *preparer* of this assessment.)
-24. Sign in as **itowner@axiarix.local**. **My Assessments** → *ASM-2026-0004*. On Q-001 click **Upload evidence**, choose `sample-evidence.pdf`, **Upload**.
-    Expect: file listed, scan *Clean*.
+23. Sign in as **admin@axiarix.local**. Open **Assessment Periods** → *Walkthrough Q3 Backup Assessment*.
+    Expect: no **Open workspace** button and no *My Assessments* menu item — System Administrators oversee assessments (Change owner, Export, Reopen) but the department fills them in.
+24. Sign in as **itowner@axiarix.local**. **My Assessments** → *ASM-2026-0004*. On Q-001 choose **Compliant**, comment `Restore drill done 02 Nov`, **Save answer**; then click **Upload evidence**, choose `sample-evidence.pdf`, **Upload**.
+    Expect: status *In progress*; file listed, scan *Clean*.
 25. Click **Submit for audit** → **Submit**.
     Expect: status *Submitted for audit*; workspace read-only.
 
 ## Part 5 – Separation of duties and audit review
 
-26. Sign in as **admin@axiarix.local**. Open ASM-2026-0004 (Assessment Periods).
-    Expect: blue *Separation of duties* note: *You prepared this assessment … so another auditor must review it*; no **Audit review** button.
+26. Still as **itowner@axiarix.local**, open ASM-2026-0004 in **Assessment Periods**.
+    Expect: read-only; no review buttons. (Whoever prepares an assessment can never audit or approve it: someone holding both an IT owner and an auditor role gets a blue *Separation of duties* note instead of **Start review**. This is covered by the automated test `governance.test › preparers cannot audit`.)
 27. Sign in as **auditor@axiarix.local**. **Auditor Workspace** → *Walkthrough Q3 Backup Assessment* → **Start review**.
     Expect: status *Under review*.
 28. On Q-001 click **Accept** for the evidence, then **Accept answer** for the answer. Repeat for every other answered question.

@@ -39,9 +39,9 @@ function Logo({ expanded }: { expanded: boolean }) {
 }
 
 function Sidebar({ expanded, mobileOpen, onClose }: { expanded: boolean; mobileOpen: boolean; onClose: () => void }) {
-  const { can } = useAuth();
+  const { can, hasRole } = useAuth();
   const wide = expanded || mobileOpen;
-  const items = NAV.filter((n) => n.any.length === 0 || can(...n.any));
+  const items = NAV.filter((n) => (n.any.length === 0 || can(...n.any)) && (!n.roles || hasRole(...(n.roles as Parameters<typeof hasRole>))));
   const groups = (['platform', 'programme', 'audit', 'admin'] as const).map((g) => ({ g, items: items.filter((i) => i.group === g) })).filter((x) => x.items.length);
   const bottom = items.filter((i) => i.group === 'account');
   const renderItem = (n: NavItem) => {

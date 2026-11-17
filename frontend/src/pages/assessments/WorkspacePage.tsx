@@ -268,7 +268,7 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
     );
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const item = q.data!;
-  const isOwnerish = a.ownerId === user?.id || hasRole('IT_OWNER', 'SYSTEM_ADMIN');
+  const isOwnerish = a.ownerId === user?.id || hasRole('IT_OWNER');
   const assignedToMe = item.assignment?.assigneeId === user?.id;
   const statusEditable = a.actions.respond && (a.status !== 'CLARIFICATION_REQUIRED' || item.clarificationOpen);
   const editable = mode === 'respond' && statusEditable && (isOwnerish || assignedToMe) && can('response:update');
@@ -281,7 +281,9 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
   const lockedReason =
     mode !== 'respond'
       ? null
-      : !a.actions.respond
+      : !a.actions.respond && ['ASSIGNED', 'IN_PROGRESS', 'CLARIFICATION_REQUIRED'].includes(a.status)
+        ? `${a.department.name} fills in this assessment: its owner, IT Department Owners and the people questions are assigned to. You can view it.`
+        : !a.actions.respond
         ? `This assessment is ${ASSESSMENT_STATUS[a.status]?.label.toLowerCase()} and read-only. Changes require a formal reopen.`
         : a.status === 'CLARIFICATION_REQUIRED' && !item.clarificationOpen
           ? 'Only questions with an open clarification request can change during clarification.'

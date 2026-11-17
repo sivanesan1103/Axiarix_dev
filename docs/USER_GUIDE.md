@@ -19,6 +19,8 @@ Sign in at the Axiarix address with your hospital account. The left icon rail sh
 
 ## System Administrator
 
+- Administrators set up and oversee: they see every assessment (and can **Change owner**, export and reopen) but do not fill them in — there is no *Open workspace* or *My Assessments* for them. Answering, evidence and submission belong to the department.
+
 - **Hospitals & Branches** – edit the organisation, add branches (sites) and departments, set department owners, activate or deactivate.
 - **Users & Access Control** – invite users (they receive a set-password link), assign roles with an organisation, branch or department scope, deactivate with a reason (sessions end immediately), and **Restrict permissions** to take chosen permissions away from one person (with a reason and optional end date). On the *Roles & permissions* tab, adjust the permission matrix for non-admin roles. Branch administrators manage only their branch; nobody changes their own access.
 - **Settings** – workflow (approval step, clarification, N/A acceptance), security (MFA enforcement, lock-out), uploads (formats, size), scoring policy versions, retention and secure-deletion requests, notifications (SMTP test, reminders), report configuration, assessment schedules, and **Regional settings** (time zone used on every screen and in reports; default Asia/Kolkata).

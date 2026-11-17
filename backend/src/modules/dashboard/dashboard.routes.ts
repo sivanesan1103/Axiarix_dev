@@ -187,7 +187,7 @@ dashboardRouter.get('/tasks', async (req, res) => {
     }),
     p('assessment:update') ? prisma.assessment.findMany({ where: { ...scope, status: 'DRAFT' }, select: pick, take: 5, orderBy: { createdAt: 'desc' } }) : [],
     p('assessment:submit')
-      ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['IN_PROGRESS', 'CLARIFICATION_REQUIRED', 'ASSIGNED'] }, ...(user.roles.some((r) => r === 'IT_OWNER' || r === 'SYSTEM_ADMIN') ? {} : { ownerId: user.id }) }, select: pick, take: 5, orderBy: { dueDate: 'asc' } })
+      ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['IN_PROGRESS', 'CLARIFICATION_REQUIRED', 'ASSIGNED'] }, ...(user.roles.includes('IT_OWNER') ? {} : { ownerId: user.id }) }, select: pick, take: 5, orderBy: { dueDate: 'asc' } })
       : [],
     p('assessment:review') ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['SUBMITTED_FOR_AUDIT', 'UNDER_REVIEW'] } }, select: { ...pick, ownerId: true }, take: 10 }) : [],
     p('assessment:approve') ? prisma.assessment.findMany({ where: { ...scope, status: 'PENDING_APPROVAL' }, select: { ...pick, ownerId: true }, take: 10 }) : [],

@@ -296,7 +296,7 @@ export async function assertCanEditItem(req: Request, a: { id: string; status: A
     throw new AppError(409, 'ASSESSMENT_LOCKED', 'This assessment has been submitted and is read-only. It must be formally reopened before answers can change.');
   }
   if (!user.permissions.has('response:update')) throw forbidden();
-  const isDeptOwner = a.ownerId === user.id || hasRole(user, 'IT_OWNER', 'SYSTEM_ADMIN');
+  const isDeptOwner = a.ownerId === user.id || hasRole(user, 'IT_OWNER');
   if (!isDeptOwner) {
     const assignment = await prisma.assessmentAssignment.findUnique({ where: { assessmentId_itemId: { assessmentId: a.id, itemId } } });
     if (assignment?.assigneeId !== user.id) throw forbidden('This question is not assigned to you');
@@ -371,7 +371,7 @@ export async function validateForSubmission(assessmentId: string, db: Tx = prism
 export async function submitAssessment(req: Request, id: string) {
   const a = await loadAssessment(req, id);
   const user = req.user!;
-  if (!(a.ownerId === user.id || hasRole(user, 'IT_OWNER', 'SYSTEM_ADMIN'))) throw forbidden('Only the department owner can submit this assessment');
+  if (!(a.ownerId === user.id || hasRole(user, 'IT_OWNER'))) throw forbidden('Only the department owner can submit this assessment');
   if (!['IN_PROGRESS', 'CLARIFICATION_REQUIRED'].includes(a.status)) {
     throw invalidState(a.status === 'ASSIGNED' ? 'Answer at least one question before submitting' : `Assessment is already ${a.status.replaceAll('_', ' ').toLowerCase()}`);
   }
@@ -529,7 +529,11 @@ export async function reopen(req: Request, id: string, reason: string) {
 export async function allowedActions(req: Request, a: { id: string; status: AssessmentStatus; ownerId: string; approvalRequired: boolean }) {
   const u = req.user!;
   const p = (k: string) => u.permissions.has(k as never);
-  const isOwner = a.ownerId === u.id || hasRole(u, 'IT_OWNER', 'SYSTEM_ADMIN');
+  // Department work (answering, submitting) belongs to the department: the assessment owner, its IT
+  // Department Owners and people assigned questions. System Administrators configure the system and
+  // oversee assessments but do not fill them in (BRD §5), which also keeps them out of the preparers.
+  const isOwner = a.ownerId === u.id || hasRole(u, 'IT_OWNER');
+  const assignedToMe = !isOwner && (await prisma.assessmentAssignment.count({ where: { assessmentId: a.id, assigneeId: u.id } })) > 0;
   const participants = await assessmentParticipants(a);
   const auditBlock = sodBlockReason(u.id, participants, 'audit');
   const approveBlock = sodBlockReason(u.id, participants, 'approve');
@@ -542,7 +546,7 @@ export async function allowedActions(req: Request, a: { id: string; status: Asse
     changeOwner: p('assessment:update') && ['DRAFT', ...EDITABLE_STATUSES].includes(a.status),
     release: p('assessment:update') && a.status === 'DRAFT',
     assign: p('assessment:assign') && ['DRAFT', ...EDITABLE_STATUSES].includes(a.status),
-    respond: p('response:update') && EDITABLE_STATUSES.includes(a.status),
+    respond: p('response:update') && EDITABLE_STATUSES.includes(a.status) && (isOwner || assignedToMe),
     submit: p('assessment:submit') && isOwner && ['IN_PROGRESS', 'CLARIFICATION_REQUIRED'].includes(a.status),
     startReview: p('assessment:review') && a.status === 'SUBMITTED_FOR_AUDIT' && !auditBlock,
     review: p('assessment:review') && a.status === 'UNDER_REVIEW' && !auditBlock,

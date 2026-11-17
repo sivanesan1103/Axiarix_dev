@@ -57,8 +57,9 @@ Blocked people see a *Separation of duties* note, and their Pending tasks leave 
 |---|---|
 | Assignees and owners (questions, assessment owner, finding owner, corrective action owner) must work in the record's branch and department | `assertUserCoversUnit` |
 | An open assessment's owner can be changed by an ISMS owner or administrator, with a reason | `changeOwner` |
+| Only the department fills in an assessment: its owner, IT Department Owners of that department and people assigned questions. System Administrators can view, change the owner, release and reopen, but not answer, upload or submit | `assertCanEditItem`, `allowedActions` |
 | Contributors answer only questions assigned to them | `assertCanEditItem` |
-| Only the department owner (or IT owner/admin) submits | `submitAssessment` |
+| Only the department owner (or an IT Department Owner of that department) submits | `submitAssessment` |
 | Submitted assessments are read-only; changes need a reopen with reason | `ASSESSMENT_LOCKED` (409), audited `RESPONSE_EDIT_BLOCKED` |
 | During clarification only flagged questions are editable | `openClarificationItemIds` |
 | The finding owner (any role, including a contributor) can plan its corrective action | `createAction` |

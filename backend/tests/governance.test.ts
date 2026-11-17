@@ -227,21 +227,37 @@ describe.sequential('separation of duties', () => {
     expect(ok.body.data.periodEnd).toBe('2026-12-31T00:00:00.000Z');
     const id = ok.body.data.id as string;
     await isms.post(`/api/v1/assessments/${id}/release`);
-    // The administrator answers every question as N/A and submits: they are now a preparer.
     const items = await prisma.checklistItem.findMany({ where: { versionId: state.versionId } });
+    // System Administrators oversee assessments but do not fill them in.
+    const adminFlags = (await admin.get(`/api/v1/assessments/${id}`)).body.data.actions;
+    expect(adminFlags.respond).toBe(false);
+    expect((await admin.put(`/api/v1/assessments/${id}/responses/${items[0].id}`, { status: 'COMPLIANT' })).status).toBe(403);
+
+    // Someone who is the department's IT owner and also an auditor and ISMS owner prepares it…
+    const roleId = async (key: string) => (await prisma.role.findFirstOrThrow({ where: { organisationId: base.ctx.org.id, key } })).id;
+    const dual = await prisma.user.create({ data: { email: 'dual.role@axiarix.local', name: 'Dual Role', organisationId: base.ctx.org.id, passwordHash: await hashPassword(PASSWORD), status: 'ACTIVE' } });
+    await prisma.userRole.createMany({
+      data: [
+        { userId: dual.id, roleId: await roleId('IT_OWNER'), organisationId: base.ctx.org.id, siteId: base.ctx.primary.id, departmentId: base.ctx.primaryDept.id },
+        { userId: dual.id, roleId: await roleId('AUDITOR'), organisationId: base.ctx.org.id },
+        { userId: dual.id, roleId: await roleId('ISMS_OWNER'), organisationId: base.ctx.org.id },
+      ],
+    });
+    const dualClient = await login('dual.role@axiarix.local');
     for (const i of items) {
-      const r = await admin.put(`/api/v1/assessments/${id}/responses/${i.id}`, { status: 'NOT_APPLICABLE', justification: 'Out of scope for this test' });
+      const r = await dualClient.put(`/api/v1/assessments/${id}/responses/${i.id}`, { status: 'NOT_APPLICABLE', justification: 'Out of scope for this test' });
       expect(r.status).toBe(200);
     }
-    expect((await admin.post(`/api/v1/assessments/${id}/submit`)).status).toBe(200);
-    const flags = (await admin.get(`/api/v1/assessments/${id}`)).body.data.actions;
+    expect((await dualClient.post(`/api/v1/assessments/${id}/submit`)).status).toBe(200);
+    // …so they can neither audit nor approve it.
+    const flags = (await dualClient.get(`/api/v1/assessments/${id}`)).body.data.actions;
     expect(flags.startReview).toBe(false);
     expect(flags.blocked.review).toMatch(/prepared this assessment/);
-    expect((await admin.post(`/api/v1/assessments/${id}/start-review`)).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await dualClient.post(`/api/v1/assessments/${id}/start-review`)).body.error.code).toBe('SEGREGATION_OF_DUTIES');
     expect((await auditor.post(`/api/v1/assessments/${id}/start-review`)).status).toBe(200);
     for (const i of items) await auditor.post(`/api/v1/assessments/${id}/items/${i.id}/review`, { decision: 'ACCEPTED' });
     expect((await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'All answers and evidence reviewed; controls operating.' })).body.data.status).toBe('PENDING_APPROVAL');
-    expect((await admin.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await dualClient.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
     expect((await isms.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).status).toBe(200);
   });
 });
