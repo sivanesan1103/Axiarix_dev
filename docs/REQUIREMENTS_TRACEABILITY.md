@@ -12,6 +12,21 @@ Checked on 17 November 2026 against `Axiarix_ISO27001_2022_BRD_Hospital_IT_Pilot
 
 **Fixed during this check:** search did not cover checklist questions (FR-027). The dashboard had no department filter or per-department view (FR-021, BRD §9). Dates had no configurable time zone, and PDF reports printed UTC (SRS 2.3, NFR-10). All three are now implemented and tested.
 
+## 0. Handwritten requirements note (12 November 2026)
+
+The photographed note in the project folder lists 8 points; each maps to the BRD:
+
+| # | Note | BRD | Status |
+| --- | --- | --- | --- |
+| 1 | Centralised compliance checklist | BR-01 | ✅ |
+| 2 | Checklist periodically updated | BR-02 (versions) | ✅ |
+| 3 | Fill the checklist every quarter (IA) | BR-03 | ✅ |
+| 4 | Provide proof in a centralised location | BR-04 | ✅ |
+| 5 | Hospitals with branches: reports with unit-wise details | BR-09 | ✅ |
+| 6 | Auditors verify, give their inputs, kept centrally | BR-05 | ✅ |
+| 7 | Once the auditor has updated, the final PDF is generated | BR-07 | ✅ |
+| 8 | Reports on a dashboard and stored centrally | BR-08, FR-023 | ✅ |
+
 ## 1. BRD business requirements
 
 | BRD | Requirement | Met by (SRS) | Where in the app | Verified | Status |
