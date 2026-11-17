@@ -34,7 +34,7 @@ function AssignDialog({ a, itemIds, open, onOpenChange, onDone }: { a: Assessmen
         <DialogHeader title={`Assign ${itemIds.length} question(s)`} description="The assignee is notified and can answer and attach evidence for these questions." />
         <DialogBody className="space-y-4">
           <Field label="Assignee" required htmlFor="as-user">
-            <UserSelect id="as-user" value={assignee} onChange={setAssignee} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={a.site.id} />
+            <UserSelect id="as-user" value={assignee} onChange={setAssignee} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={a.site.id} departmentId={a.department.id} placeholder={`Someone in ${a.department.name}`} />
           </Field>
           <Field label="Due date (optional)" hint={`Defaults to the assessment due date (${formatDate(a.dueDate)}).`} htmlFor="as-due">
             <Input id="as-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
@@ -44,6 +44,43 @@ function AssignDialog({ a, itemIds, open, onOpenChange, onDone }: { a: Assessmen
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="primary" disabled={!assignee} loading={m.isPending} onClick={() => m.mutate()}>
             Assign
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Hand the assessment to another owner in the same department (with a recorded reason). */
+function ChangeOwnerDialog({ a, open, onOpenChange, onDone }: { a: AssessmentDetail; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
+  const [owner, setOwner] = useState('');
+  const [reason, setReason] = useState('');
+  const m = useMutation({
+    mutationFn: () => assessmentsService.changeOwner(a.id, owner, reason.trim()),
+    onSuccess: () => {
+      toast.success('Owner changed. The new owner has been notified.');
+      setOwner('');
+      setReason('');
+      onDone();
+      onOpenChange(false);
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader title="Change owner" description={`The owner runs this assessment for ${a.department.name}: assigns questions and submits for audit. Only people in ${a.site.name} / ${a.department.name} are listed.`} />
+        <DialogBody className="space-y-4">
+          <Field label="New owner" required htmlFor="co-user">
+            <UserSelect id="co-user" value={owner} onChange={setOwner} roles={['IT_OWNER']} siteId={a.site.id} departmentId={a.department.id} placeholder={`IT Department Owner of ${a.department.name}`} />
+          </Field>
+          <Field label="Reason" required hint="Recorded in the audit trail." htmlFor="co-reason">
+            <Input id="co-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Wrong owner chosen at creation" />
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="primary" disabled={!owner || owner === a.ownerId || reason.trim().length < 3} loading={m.isPending} onClick={() => m.mutate()}>
+            Change owner
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -172,7 +209,7 @@ export function AssessmentDetailPage() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['assessment', id], queryFn: () => assessmentsService.get(id) });
   const history = useQuery({ queryKey: ['assessment-history', id], queryFn: () => assessmentsService.history(id) });
-  const [dlg, setDlg] = useState<null | 'release' | 'approve' | 'reject' | 'reopen' | 'finalise'>(null);
+  const [dlg, setDlg] = useState<null | 'release' | 'approve' | 'reject' | 'reopen' | 'finalise' | 'owner'>(null);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['assessment', id] });
     qc.invalidateQueries({ queryKey: ['assessment-history', id] });
@@ -245,6 +282,11 @@ export function AssessmentDetailPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            {a.actions.changeOwner && (
+              <Button onClick={() => setDlg('owner')}>
+                <UserPlus /> Change owner
+              </Button>
+            )}
             {a.actions.reopen && (
               <Button variant="danger-outline" onClick={() => setDlg('reopen')}>
                 <RotateCcw /> Reopen
@@ -254,6 +296,13 @@ export function AssessmentDetailPage() {
         }
       />
       <SodNotice messages={[a.actions.blocked?.review, a.actions.blocked?.approve]} />
+      {a.ownerHasAccess === false && (
+        <div className="rounded-lg border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad" role="alert">
+          <strong>{a.owner.name}</strong> owns this assessment but has no access to {a.site.name} / {a.department.name}, so they cannot open it, assign questions or submit it.
+          {a.actions.changeOwner ? ' Use Change owner to hand it to someone in this department.' : ' Ask an ISMS owner or administrator to change the owner.'}
+        </div>
+      )}
+      <ChangeOwnerDialog a={a} open={dlg === 'owner'} onOpenChange={(o) => !o && setDlg(null)} onDone={() => qc.invalidateQueries({ queryKey: ['assessment', a.id] })} />
       <Card className="px-5 py-5">
         <LifecycleStepper status={a.status} approvalRequired={a.approvalRequired} />
       </Card>

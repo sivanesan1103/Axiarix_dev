@@ -1,6 +1,6 @@
 # Axiarix – User Guide & Workflow Tutorial
 
-16 November 2026 · exported from the Claude Docs version of this guide
+17 November 2026 · exported from the Claude Docs version of this guide
 
 ## Overview
 
@@ -109,6 +109,31 @@ Every person holds one or more roles, and each role is granted inside a scope: t
 
 - **A whole role:** Users & Access Control → *Roles & permissions*. Only an organisation-wide System Administrator can change it, and the change applies in that organisation only. System Administrator permissions cannot be reduced.
 - **One person:** Users → ⋯ → *Restrict permissions*. This removes chosen permissions from that person only, optionally until a date, and needs a reason. See Tutorial 2.
+
+## Who gives tasks to whom
+
+Every piece of work in Axiarix is a task given to a named person, and it appears in that person's **Pending tasks** on the Dashboard. People lists only offer someone who works in the record's branch and department, and the server refuses anyone else, so a task never goes to a person who cannot open it.
+
+| Task | Given by | Given to | How to give it | Where the person sees it |
+| --- | --- | --- | --- | --- |
+| Run an assessment | ISMS owner or administrator | The IT Department Owner of that department | **New assessment** → *Assessment owner*, then **Assign to department** | "Release ASM-…" until released; then My Assessments and "Submit…" |
+| Answer questions | IT Department Owner (or administrator) | Contributors and IT owners of the same department | Assessment → *Questions & assignments* → tick questions → **Assign / reassign**. Or set *Default owner* on a checklist question so it is assigned automatically | "Answer N question(s): …" and My Assessments → *My open question assignments* |
+| Review a checklist | The checklist author | Anyone else with checklist approval rights | **Submit for review** → *Reviewer* | "Review checklist: …" |
+| Audit an assessment | Automatic when the department submits | Auditors covering that branch who did not prepare it | Department owner clicks **Submit for audit** | "Review ASM-…" and Auditor Workspace |
+| Fix a finding | Auditor | Someone in that department | **Raise finding** → *Owner*, or on the finding → **Assign** | "Plan action for FND-…" and Findings → *Owned by me* |
+| Carry out a corrective action | Finding owner or IT Department Owner | Someone in that department | Finding → **Plan corrective action** → *Owner* | "CA-… corrective action" and Corrective Actions → *My actions* |
+| Verify a corrective action | Automatic when the owner submits it | Auditors covering that branch, not the action owner | Owner clicks **Submit for verification** | "Verify CA-…" |
+| Approve and issue the report | Automatic when the auditor submits the review | ISMS owners who did not prepare or audit it | Auditor clicks **Submit review** | "Approve ASM-…" |
+
+A person only sees tasks they are allowed to do: an auditor who answered questions on an assessment does not get its review task, and an approver who audited it does not get its approval task.
+
+**Audit review is complete only when every answer is decided.** Before **Submit review** works, the auditor must accept, reject or ask for clarification on every answered question, and accept or reject every evidence file. The review screen shows *Reviewed X of Y* and marks each question still waiting. A decision stays valid across clarification rounds unless the answer changes or new evidence is uploaded. Accepting a file does not accept the answer: use **Accept answer** as well. Rejecting a file or asking for clarification counts as the decision, because the question goes back to the department.
+
+**Changing the owner.** If the wrong owner was picked, or the owner is away, an ISMS owner or administrator opens the assessment and clicks **Change owner**. Only IT Department Owners of that department are offered, a reason is required, and the change is recorded in the audit trail. If an owner has no access to the assessment's department, a red warning appears at the top of the assessment.
+
+**People who may not upload evidence.** When an administrator restricts someone's evidence uploads (Users → ⋯ → **Restrict permissions**), that person can still answer their questions and work on their findings and corrective actions, but sees no upload buttons. A note asks them to have the department owner attach the file.
+
+**Finding owners plan the fix.** Whoever owns a finding, including an IT Control Owner, can use **Plan corrective action**. The auditor still verifies the action before the finding closes.
 
 ## Finding your way around
 
@@ -323,24 +348,26 @@ An assessment applies one published checklist version to one department for one 
 ### Create and release (ISMS owner)
 
 1. Open **Assessment Periods** and click **New assessment**.
-2. Enter a title, pick the **site**, the **department** and a **published checklist version**. The department's owner is filled in as the assessment owner.
+2. Enter a title, pick the **site**, the **department** and a **published checklist version**. The department's owner is filled in as the assessment owner; only IT Department Owners of that department are offered.
 3. Choose the **period** from the three pickers: *Period type* (Quarter, Half year or Financial year), the quarter or half, and the *Financial year*. The line below shows the label and dates, e.g. *Q3 FY2026-27 · 1 Oct 2026 – 31 Dec 2026*. Periods follow the Indian financial year (Q1 = Apr–Jun … Q4 = Jan–Mar); free text is not accepted.
 4. Set the start and due dates, an optional scope statement, and whether a separate approval is required (on by default).
 5. Click **Create assessment**. It starts as *Draft* with the checklist version and scoring policy pinned.
 6. Click **Assign to department** to release it. The owner is notified and the status becomes *Assigned*.
+7. If the wrong owner was chosen or the owner is away, click **Change owner** on the assessment while it is open, pick another owner from that department and give a reason. A red warning at the top shows when an owner has no access to the assessment's department.
 
 ![New assessment with the period pickers: Q3 FY2026-27, 1 Oct – 31 Dec 2026](screenshots/guide/17-new-assessment.png)
 
 ### Assign questions (department owner)
 
 1. Open the assessment, tab **Questions & assignments**.
-2. Tick questions and click **Assign** to give them to a contributor, with an optional due date. Contributors can only answer questions assigned to them; the department owner can answer any.
+2. Tick questions and click **Assign / reassign** to give them to a contributor, with an optional due date. Only people from the assessment's department are offered. Contributors can only answer questions assigned to them; the department owner can answer any.
+3. The person sees "Answer N question(s)" in *Pending tasks* on the Dashboard and the questions under My Assessments.
 
 ### Answer and attach evidence
 
 1. Open **My Assessments** and click the assessment (or a question under *My open question assignments*). The workspace lists questions on the left and the selected question on the right.
 2. Choose an answer: Compliant, Partially compliant, Non-compliant or Not applicable. Not applicable needs a justification. Add a comment and click **Save answer**. The first saved answer moves the assessment to *In progress*.
-3. Click **Upload evidence** and drop a file (PDF, DOCX, XLSX, CSV, PNG, JPG; 25 MB by default). Each file is checksummed and malware-scanned; executables, disguised files and test viruses are refused.
+3. Click **Upload evidence** and drop a file (PDF, DOCX, XLSX, CSV, PNG, JPG; 25 MB by default). Each file is checksummed and malware-scanned; executables, disguised files and test viruses are refused. Someone restricted from uploading sees a note instead and asks the department owner to attach the file.
 4. Use **Add comment** to discuss a question with colleagues or the auditor.
 
 ![Assessment workspace: questions on the left, answer, previous audit observations and evidence on the right](screenshots/guide/18-workspace.png)
@@ -367,11 +394,12 @@ An independent auditor reviews every answer and evidence file, asks for clarific
 1. Open **Auditor Workspace**. The tiles count what is awaiting review, evidence to verify, clarifications out, open and critical/high findings, actions to verify and completed reviews. The *Review queue* lists submitted assessments.
 2. Click an assessment, then **Start review**. The status becomes *Under review*.
 3. For each question, check the answer and each evidence file (preview opens a 5-minute signed link). Then:
-   - **Accept** the evidence or answer;
+   - **Accept** each evidence file, and **Accept answer** for the answer itself. Accepting a file does not accept the answer;
    - **Reject** evidence with a reason (the owner is notified and the file is marked rejected);
    - **Request clarification** with a reason, which reopens just that question for the department;
    - **Add comment** for a note without a decision.
 4. Not applicable answers can be required to carry your explicit acceptance (Settings → *Workflow & uploads*).
+5. The top of the screen shows *Reviewed X of Y*, and questions still waiting are marked *needs your decision*. A decision stays valid across clarification rounds unless the answer changes or new evidence arrives.
 
 ![Auditor Workspace: tiles, review queue, actions to verify and open findings](screenshots/guide/19-auditor-workspace.png)
 
@@ -385,16 +413,16 @@ An independent auditor reviews every answer and evidence file, asks for clarific
 
 ### Submit the review
 
-Click **Submit review** and write your overall opinion.
+Click **Submit review** and write your overall opinion (at least 20 characters). The dialog lists any question still waiting for a decision, and **Submit review** stays disabled until there are none.
 
 - If any clarification is still open, the assessment goes to *Clarification required*. The department answers only the flagged questions and clicks **Submit for audit** again, and you review the new round.
 - Otherwise it becomes *Reviewed*, and moves to *Pending approval* when approval is required.
 
 ### Corrective actions (department)
 
-1. The finding owner opens the finding on **Findings** and clicks **Plan corrective action**: root cause, correction, corrective action, owner and target date.
+1. The finding owner opens the finding from *Pending tasks* ("Plan action for FND-…") or **Findings** and clicks **Plan corrective action**: root cause, correction, corrective action, owner and target date. Any finding owner can do this, including an IT Control Owner.
 2. On the action, **Update progress** records notes and a percentage.
-3. **Upload** closure evidence, then **Submit for verification** with closure notes. At least one clean, non-rejected evidence file is required.
+3. **Upload** closure evidence, then **Submit for verification** with closure notes. At least one clean, non-rejected evidence file is required. If the action owner is restricted from uploading, the department owner attaches the file.
 
 ### Verify and close (auditor)
 
@@ -513,11 +541,28 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | *Use a period such as "Q3 FY2026-27"* | Period not in a fixed format | Use the period pickers on New assessment |
 | A list looks empty | A top-bar scope or a page filter is active | Look at the *Filtered by* row and click *Clear all* |
 | Invitation link doesn't work | Links expire after 30 minutes | Use *Forgot password?* to send a fresh one |
+| Red warning: the owner *has no access* to the assessment | The owner works in another department | An ISMS owner or administrator clicks **Change owner** |
+| A person is missing from an assignee or owner list | Lists only show people from the record's branch and department | Give the person a role in that department, or pick someone who works there |
+| **Submit review** is greyed out | Some answers or files have no decision yet | Click each question listed in the dialog and decide it |
+| No **Upload** button, with a note | An administrator restricted your evidence uploads | Ask the department owner to attach the file |
 | *Organisations are created by a platform owner* | Organisation admins can't create organisations | Sign in as the platform owner |
 
 **Why can't the admin do everything?** By design, the System Administrator holds every permission but still can't publish a checklist they wrote, audit an assessment they prepared, approve one they prepared or audited, or change their own access. This keeps the audit evidence independent (ISO/IEC 27001 A.5.3).
 
 **Does restricting someone change their role?** No. The role stays the same for everyone else; only that person loses the chosen permissions.
+
+## Release notes – 17 November 2026
+
+| Area | Change |
+| --- | --- |
+| Task assignment | People lists only offer someone from the record's branch and department, and the server refuses anyone else. *Pending tasks* now also lists questions to answer, drafts to release, checklist reviews and findings to fix |
+| Assessment owner | New **Change owner** button, with a reason that is recorded in the audit trail. On New assessment the owner list follows the chosen department. A red warning shows when the owner cannot open the assessment |
+| Audit review | Every answer and evidence file needs a decision. Accepting a file no longer accepts the answer. A *Reviewed X of Y* counter shows progress, **Accept answer** becomes *Answer accepted* once done, and the history says whether the answer or the evidence was accepted |
+| Restrictions | People restricted from uploading, raising findings or changing answers no longer see those buttons; a note says who can do it |
+| Corrective actions | Whoever owns a finding, including an IT Control Owner, can plan its corrective action |
+| Checklist review | The reviewer list is based on approval permission; only the reviewer or the comment's author resolves a comment |
+| Screens | Pop-up forms keep their buttons on screen in short windows; role changes appear without reloading |
+| Quality | 65 backend, 11 frontend and 2 browser tests pass; the whole workflow was run in Chrome with five Meridian users |
 
 ## Release notes – 16 November 2026
 
@@ -530,8 +575,8 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | Periods | Fixed Indian financial-year labels picked from lists; dates derived |
 | Navigation | Scope button at every width, collapsible search, grouped sidebar matching each role's access, Admin Home |
 | Filters | Branch and period apply to every list; filters kept in the page link; *Filtered by* chips; exports match the rows shown; checklist status filter uses the current version |
-| Fixes | Settings no longer errors for non-admins; the Dashboard, Users roles grid and detail pages no longer scroll sideways on narrow screens; period pickers no longer cut off their labels |
-| Quality | 62 backend, 11 frontend and 2 browser tests pass; a page-by-page check of 11 accounts on desktop and phone found no errors |
+| Fixes | Settings no longer errors for non-admins; the Dashboard, Users roles grid and detail pages no longer scroll sideways on narrow screens; period pickers no longer cut off their labels; an audit review needs a decision on every answer and evidence file; people pickers and the server only accept assignees from the record's department; reviewer list based on approval permission; only the reviewer or comment author resolves review comments; Pending tasks now include questions to answer, drafts to release, checklist reviews and findings to fix; role changes appear without a page reload |
+| Quality | 64 backend, 11 frontend and 2 browser tests pass; a page-by-page check of 11 accounts on desktop and phone found no errors |
 
 ## Onboarding run: Meridian Diagnostics (Sample)
 
@@ -572,6 +617,33 @@ Platform owner for this run: platform@axiarix.local / `Axiarix@Dev2026` at http:
 Checked and not a bug: the "test pvt" organisation's administrator is shown as Anita Rao because that is the name entered for admin@test.com.
 
 Tarun's restriction was checked against the server: his account has no `evidence:create` permission and an evidence upload is refused (403).
+
+### Full workflow run in Chrome
+
+On the evening of 16 November 2026 the whole workflow was run in Chrome with five Meridian users, each in their own tab, on a new assessment ASM-2026-0012 (Meridian Central Lab / Lab IT Support).
+
+| Step | Who | What happened |
+| --- | --- | --- |
+| 1 | Ishita (ISMS owner) | Created the assessment. The owner list offered only Sana, the Lab IT Support owner. Released it with **Assign to department** |
+| 2 | Sana (IT Department Owner) | Saw it in *Pending tasks*, assigned both questions to Tarun. Only Sana and Tarun were offered |
+| 3 | Tarun (IT Control Owner) | Saw "Answer 2 question(s)" in *Pending tasks* and answered both. No upload button, with a note to ask Sana |
+| 4 | Sana | Uploaded the evidence for both questions and clicked **Submit for audit** |
+| 5 | Gita (Auditor) | Accepted both files and both answers (*Reviewed 2 of 2*), raised FND-2026-0005 owned by Tarun, submitted the review |
+| 6 | Tarun | Saw "Plan action for FND-2026-0005" and planned CA-2026-0005 |
+| 7 | Ishita | Saw "Approve ASM-2026-0012" and approved. Report issued: 75 % compliance, evidence 100 % verified |
+| 8 | Sana, Tarun, Gita | Sana attached the closure proof, Tarun submitted for verification, Gita verified the action and closed the finding |
+
+| # | Found when | Severity | Problem | Fix | Verified |
+| --- | --- | --- | --- | --- | --- |
+| 6 | Assigning questions | High | Sana could not open ASM-2026-0007 and so could not assign Tarun: it was for Laboratory Information Systems but owned by Sana, who works in Lab IT Support. It was created before owners were checked | **Change owner** and a warning when the owner has no access. ASM-2026-0007 was handed to Arvind Iyer | Done in Ishita's tab; no other record in any organisation has this problem |
+| 7 | New assessment | Medium | The owner list showed IT owners of every department in the branch | The list follows the chosen department and switches owner with it | Ishita's tab: only Sana offered |
+| 8 | Audit review | High | Accepting an evidence file counted as accepting the answer, so a question could pass without anyone judging the answer | The answer needs its own decision; an open rejection or clarification request still counts | Gita's tab showed *Reviewed 0 of 2* after accepting a file; backend and browser tests |
+| 9 | Audit review | Low | **Accept answer** stayed clickable and could create duplicate records; the history called every acceptance "Accepted evidence" | The button becomes *Answer accepted*; the history labels say answer or evidence | Gita's tab |
+| 10 | Finding owner | High | Tarun owned FND-2026-0005 and was shown **Plan corrective action**, but saving said "You do not have permission" | Finding owners can plan the corrective action; the auditor still verifies it | Tarun planned CA-2026-0005; backend test |
+| 11 | Restrictions | Medium | Upload buttons appeared for Tarun on questions, findings and corrective actions and failed when used | Hidden for restricted people, with a note to ask the department owner | Tarun's tab |
+| 12 | Pop-up forms | Medium | In a short window the buttons of a pop-up form went below the screen, for example **Raise finding** | The form scrolls inside the pop-up and the buttons stay visible | Gita raised FND-2026-0005 |
+| 13 | Role changes | Low | The once-a-minute role check stopped working after the sign-in token expired | It renews the token and tries again | Code change |
+| 14 | Browser test | Low | The test's approval check matched the progress-bar label, so it could pass before the approval was saved | It now checks the confirmation and the status badge | Two clean runs |
 
 ## Appendix: sample files and running locally
 

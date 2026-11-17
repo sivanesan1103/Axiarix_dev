@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import type { AuthUser } from '../types/auth.js';
-import { forbidden } from '../utils/errors.js';
+import { badRequest, forbidden } from '../utils/errors.js';
+import { prisma } from '../config/prisma.js';
 import { recordAuditSafe } from './audit.service.js';
 
 export interface UnitRef {
@@ -40,6 +41,18 @@ export function unitWhere(user: AuthUser): {
     .map((s) => (s.departmentId ? { siteId: s.siteId!, departmentId: s.departmentId } : { siteId: s.siteId! }));
   // An empty OR array matches nothing in Prisma, which is the safe default for a user with no scope.
   return { organisationId: user.organisationId, OR };
+}
+
+/**
+ * A task (assessment ownership, question, finding, corrective action) may only be given to someone
+ * who can actually open the record: active, in the organisation, with a role covering its site and department.
+ */
+export async function assertUserCoversUnit(unit: UnitRef, userId: string, what: string) {
+  const u = await prisma.user.findFirst({ where: { id: userId, organisationId: unit.organisationId, status: 'ACTIVE', isPlatformOwner: false }, include: { roles: true } });
+  if (!u) throw badRequest(`The selected ${what} is not an active member of this organisation`);
+  const covers = u.roles.some((r) => (r.siteId === null || r.siteId === unit.siteId) && (r.departmentId === null || r.departmentId === unit.departmentId));
+  if (!covers) throw badRequest(`${u.name} has no access to this branch and department, so they cannot be the ${what}. Pick someone who works there, or give them a role there first.`);
+  return u;
 }
 
 /** Site ids the user may see (null = all sites in the organisation). */

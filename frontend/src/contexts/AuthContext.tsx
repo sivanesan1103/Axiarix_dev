@@ -50,6 +50,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [reload, qc]);
 
+  // Roles, scope and restrictions can be changed by an administrator at any time. The server applies a
+  // change immediately; re-reading the profile every minute and when the tab regains focus keeps the
+  // menus and buttons in step, so nobody keeps seeing pages they lost or misses ones they gained.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    // /auth/me is not retried by the API client's 401 handler, so renew the access token here first
+    // when it has expired, then read the profile again.
+    const refresh = () => {
+      authService
+        .me()
+        .catch(async () => ((await refreshAccessToken()) ? authService.me() : Promise.reject(new Error('signed out'))))
+        .then(setUser)
+        .catch(() => undefined);
+    };
+    const t = setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [status]);
+
   const login = useCallback(async (email: string, password: string, mfaCode?: string) => {
     const r = await authService.login(email, password, mfaCode);
     if (r.mfaRequired || !r.user) return { mfaRequired: true };

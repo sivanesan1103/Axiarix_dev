@@ -143,11 +143,12 @@ assessmentsRouter.get('/:id', requirePermission('assessment:read'), async (req, 
       submissions: { select: { id: true, round: true, submittedById: true, createdAt: true }, orderBy: { round: 'desc' } },
     },
   });
-  const [metrics, actions, openClarifications, assignmentStats] = await Promise.all([
+  const [metrics, actions, openClarifications, assignmentStats, coverage] = await Promise.all([
     svc.assessmentMetrics(a.id),
     svc.allowedActions(req, a),
     svc.openClarificationItemIds(a.id, a.round),
     prisma.assessmentAssignment.groupBy({ by: ['assigneeId'], where: { assessmentId: a.id }, _count: true }),
+    svc.reviewCoverage(a),
   ]);
   const assignees = await prisma.user.findMany({ where: { id: { in: assignmentStats.map((x) => x.assigneeId) } }, select: { id: true, name: true } });
   const overallReview = await prisma.auditorReview.findFirst({
@@ -155,8 +156,13 @@ assessmentsRouter.get('/:id', requirePermission('assessment:read'), async (req, 
     orderBy: { createdAt: 'desc' },
     include: { auditor: { select: { id: true, name: true } } },
   });
+  // Warn when the owner cannot open the assessment (e.g. created before owner checks existed).
+  const ownerRoles = await prisma.userRole.findMany({ where: { userId: full.ownerId }, select: { siteId: true, departmentId: true } });
+  const ownerHasAccess = ownerRoles.some((r) => (r.siteId === null || r.siteId === full.siteId) && (r.departmentId === null || r.departmentId === full.departmentId));
   ok(res, {
     ...full,
+    ownerHasAccess,
+    reviewProgress: { reviewable: coverage.reviewable, decided: coverage.decided, pending: coverage.pending.length },
     metrics,
     actions,
     openClarificationCount: openClarifications.size,
@@ -164,6 +170,13 @@ assessmentsRouter.get('/:id', requirePermission('assessment:read'), async (req, 
     assignmentSummary: assignmentStats.map((s) => ({ assignee: assignees.find((u) => u.id === s.assigneeId), count: s._count })),
   });
 });
+
+assessmentsRouter.post(
+  '/:id/owner',
+  requirePermission('assessment:update'),
+  validate(z.object({ ownerId: z.string().uuid(), reason: z.string().trim().min(3).max(500) })),
+  async (req, res) => ok(res, await svc.changeOwner(req, param(req, 'id'), req.body.ownerId, req.body.reason)),
+);
 
 assessmentsRouter.patch('/:id', requirePermission('assessment:update'), validate(createSchema.omit({ siteId: true, departmentId: true, checklistVersionId: true }).partial()), async (req, res) =>
   ok(res, await svc.updateAssessment(req, param(req, 'id'), req.body)),
@@ -202,6 +215,7 @@ assessmentsRouter.get('/:id/items', requirePermission('assessment:read'), valida
     prisma.reviewComment.groupBy({ by: ['itemId'], where: { assessmentId: a.id }, _count: true }),
     svc.openClarificationItemIds(a.id, a.round),
   ]);
+  const coverage = ['UNDER_REVIEW', 'SUBMITTED_FOR_AUDIT'].includes(a.status) ? await svc.reviewCoverage(a) : null;
   const me = req.user!.id;
   const rows = items
     .map((item) => {
@@ -212,9 +226,11 @@ assessmentsRouter.get('/:id/items', requirePermission('assessment:read'), valida
         response,
         assignment,
         evidence: evidence.filter((e) => e.itemId === item.id),
-        latestReview: latestReviews.find((r) => r.itemId === item.id) ?? null,
+        // The answer-level decision (file decisions are shown on each file).
+        latestReview: latestReviews.find((r) => r.itemId === item.id && !r.evidenceId && r.decision !== 'COMMENT') ?? null,
         commentCount: commentCounts.find((c) => c.itemId === item.id)?._count ?? 0,
         clarificationOpen: open.has(item.id),
+        reviewPending: coverage ? (coverage.pending.find((p) => p.itemId === item.id)?.problems ?? []) : [],
       };
     })
     .filter((r) => !q.status || (r.response?.status ?? 'NOT_ASSESSED') === q.status)
@@ -294,7 +310,7 @@ assessmentsRouter.get('/:id/validation', requirePermission('assessment:read'), a
 
 assessmentsRouter.post('/:id/submit', requirePermission('assessment:submit'), async (req, res) => ok(res, await svc.submitAssessment(req, param(req, 'id'))));
 assessmentsRouter.post('/:id/start-review', requirePermission('assessment:review'), async (req, res) => ok(res, await svc.startReview(req, param(req, 'id'))));
-assessmentsRouter.post('/:id/review/submit', requirePermission('assessment:review'), validate(z.object({ opinion: z.string().trim().min(5).max(5000) })), async (req, res) =>
+assessmentsRouter.post('/:id/review/submit', requirePermission('assessment:review'), validate(z.object({ opinion: z.string().trim().min(20, 'Write at least 20 characters: your overall conclusion is printed in the final report').max(5000) })), async (req, res) =>
   ok(res, await svc.submitReview(req, param(req, 'id'), req.body.opinion)),
 );
 assessmentsRouter.post(

@@ -198,11 +198,14 @@ export interface AssessmentRow {
 
 export interface AssessmentDetail extends AssessmentRow {
   metrics: Metrics;
-  actions: Record<'edit' | 'release' | 'assign' | 'respond' | 'submit' | 'startReview' | 'review' | 'approve' | 'finalise' | 'reopen' | 'export', boolean> & {
+  ownerHasAccess?: boolean;
+  actions: Record<'edit' | 'changeOwner' | 'release' | 'assign' | 'respond' | 'submit' | 'startReview' | 'review' | 'approve' | 'finalise' | 'reopen' | 'export', boolean> & {
     /** Separation-of-duties reasons why this user cannot review or approve (shown instead of the button). */
     blocked: Partial<Record<'review' | 'approve', string>>;
   };
   openClarificationCount: number;
+  /** Answered questions the auditor has decided on, out of all answered questions. */
+  reviewProgress?: { reviewable: number; decided: number; pending: number };
   overallReview: { comments: string; createdAt: string; auditor: Ref } | null;
   approvals: { id: string; decision: string; comments: string | null; createdAt: string; approver: Ref }[];
   reports: { id: string; code: string; version: number; generatedAt: string }[];
@@ -265,6 +268,8 @@ export interface Comment {
 }
 
 export interface WorkspaceItem extends ChecklistItem {
+  /** During audit: what the auditor still has to decide on this question (empty = done). */
+  reviewPending?: string[];
   response: { id: string; status: ResponseStatus; comment: string | null; justification: string | null; updatedAt: string; responder: Ref | null } | null;
   assignment: { id: string; assigneeId: string; dueDate: string | null; assignee: Ref } | null;
   evidence: { id: string; code: string; title: string; verificationStatus: string; currentVersion: number; versions: { originalFilename: string; scanStatus: string; size: number; mimeType: string }[] }[];
@@ -288,6 +293,8 @@ export interface ItemDetail extends ChecklistItem {
 export interface FindingRow {
   id: string;
   code: string;
+  siteId: string;
+  departmentId: string;
   category: string;
   severity: string;
   title: string;

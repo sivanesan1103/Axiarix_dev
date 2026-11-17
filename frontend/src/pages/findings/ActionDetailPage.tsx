@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Pencil, Send, TrendingUp, Undo2, Upload } from 'lucide-react';
@@ -16,6 +17,7 @@ import { ActionFormDialog } from './FindingDetailPage';
 
 export function ActionDetailPage() {
   const { id = '' } = useParams();
+  const { can } = useAuth();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['action', id], queryFn: () => actionsService.get(id) });
   const [dlg, setDlg] = useState<null | 'edit' | 'progress' | 'upload' | 'submit' | 'verify' | 'return'>(null);
@@ -127,7 +129,8 @@ export function ActionDetailPage() {
               title="Closure evidence"
               description="At least one clean file is required before submitting for verification."
               actions={
-                a.actionsAllowed.edit && (
+                a.actionsAllowed.edit &&
+                can('evidence:create') && (
                   <Button size="sm" variant="soft" onClick={() => setDlg('upload')}>
                     <Upload /> Upload
                   </Button>
@@ -135,7 +138,10 @@ export function ActionDetailPage() {
               }
             />
             <CardBody>
-              <EvidenceList items={a.evidence} canVersion={a.actionsAllowed.edit} onChanged={refresh} />
+              {a.actionsAllowed.edit && !can('evidence:create') && !a.evidence.length && (
+                <p className="mb-3 rounded-md border border-warn/30 bg-warn-soft px-3 py-2 text-[13px] text-warn">You are not allowed to upload evidence. Ask the department owner to attach the proof before you submit for verification.</p>
+              )}
+              <EvidenceList items={a.evidence} canVersion={a.actionsAllowed.edit && can('evidence:create')} onChanged={refresh} />
             </CardBody>
           </Card>
           <Card>
@@ -173,6 +179,7 @@ export function ActionDetailPage() {
         title={`Edit ${a.code}`}
         initial={{ rootCause: a.rootCause ?? '', immediateCorrection: a.immediateCorrection ?? '', correctiveAction: a.correctiveAction, ownerId: a.ownerId, targetDate: toInputDate(a.targetDate) }}
         siteId={a.finding.site?.id}
+        departmentId={a.finding.departmentId}
         onSubmit={(v) => edit.mutate(v)}
         submitting={edit.isPending}
       />

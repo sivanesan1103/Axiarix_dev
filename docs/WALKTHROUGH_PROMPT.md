@@ -128,8 +128,8 @@ Records you will create get the next numbers. Expected: **ASM-2026-0004**, **FND
     Expect: blue *Separation of duties* note: *You prepared this assessment … so another auditor must review it*; no **Audit review** button.
 27. Sign in as **auditor@axiarix.local**. **Auditor Workspace** → *Walkthrough Q3 Backup Assessment* → **Start review**.
     Expect: status *Under review*.
-28. On Q-001 click **Accept** for the evidence.
-    Expect: *Accepted*.
+28. On Q-001 click **Accept** for the evidence, then **Accept answer** for the answer. Repeat for every other answered question.
+    Expect: the file shows *Accepted*, the button changes to *Answer accepted*, and the top shows *Reviewed X of Y* counting up. **Submit review** stays greyed out until every answered question is decided.
 29. Click **Raise finding**: severity **Medium**, title `DR plan lacks file-server restore`, description `File-server restore steps are not in the DR plan`. **Raise finding**.
     Expect: *Finding FND-2026-0003* shown.
 30. **Submit review**, opinion `Control effective; one observation raised`. **Submit review**.

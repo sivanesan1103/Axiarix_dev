@@ -71,7 +71,12 @@ function ResponseForm({ a, item, editable, lockedReason, onSaved }: { a: Assessm
     return () => window.removeEventListener('beforeunload', h);
   }, [dirty]);
   const m = useMutation({
-    mutationFn: () => assessmentsService.saveResponse(a.id, item.id, { status, comment: comment || null, justification: justification || null }),
+    mutationFn: () =>
+      assessmentsService.saveResponse(a.id, item.id, {
+        status,
+        comment: comment || null,
+        justification: justification || null,
+      }),
     onSuccess: () => {
       toast.success(`${item.questionCode} saved`);
       onSaved();
@@ -130,7 +135,11 @@ function ResponseForm({ a, item, editable, lockedReason, onSaved }: { a: Assessm
 function ReviewDecision({ a, item, evidenceId, onDone }: { a: AssessmentDetail; item: ItemDetail; evidenceId?: string; onDone: () => void }) {
   const [mode, setMode] = useState<null | 'REJECTED' | 'CLARIFICATION_REQUESTED'>(null);
   const accept = useMutation({
-    mutationFn: () => assessmentsService.reviewItem(a.id, item.id, { decision: 'ACCEPTED', evidenceId }),
+    mutationFn: () =>
+      assessmentsService.reviewItem(a.id, item.id, {
+        decision: 'ACCEPTED',
+        evidenceId,
+      }),
     onSuccess: () => (toast.success('Evidence accepted'), onDone()),
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -151,7 +160,11 @@ function ReviewDecision({ a, item, evidenceId, onDone }: { a: AssessmentDetail; 
         tone="danger"
         confirmLabel={mode === 'REJECTED' ? 'Reject' : 'Request'}
         onConfirm={async (reason) => {
-          await assessmentsService.reviewItem(a.id, item.id, { decision: mode!, evidenceId, reason });
+          await assessmentsService.reviewItem(a.id, item.id, {
+            decision: mode!,
+            evidenceId,
+            reason,
+          });
           toast.success(mode === 'REJECTED' ? 'Evidence rejected' : 'Clarification requested');
           onDone();
         }}
@@ -171,11 +184,31 @@ function Thread({ a, item, onPosted }: { a: AssessmentDetail; item: ItemDetail; 
     onError: (e) => toast.error(errorMessage(e)),
   });
   const timeline = [
-    ...item.reviews.filter((r) => r.decision !== 'REVIEW_SUBMITTED').map((r) => ({ id: r.id, at: r.createdAt, who: r.auditor.name, kind: r.decision, text: r.reason || r.comments || '', round: r.round, resolved: !!r.resolvedAt })),
-    ...item.comments.map((c) => ({ id: c.id, at: c.createdAt, who: c.author.name, kind: 'COMMENT_THREAD' as const, text: c.body, round: 0, resolved: false })),
+    ...item.reviews
+      .filter((r) => r.decision !== 'REVIEW_SUBMITTED')
+      .map((r) => ({
+        id: r.id,
+        at: r.createdAt,
+        who: r.auditor.name,
+        kind: !r.evidenceId && (r.decision === 'ACCEPTED' || r.decision === 'REJECTED') ? `${r.decision}_ANSWER` : r.decision,
+        text: r.reason || r.comments || '',
+        round: r.round,
+        resolved: !!r.resolvedAt,
+      })),
+    ...item.comments.map((c) => ({
+      id: c.id,
+      at: c.createdAt,
+      who: c.author.name,
+      kind: 'COMMENT_THREAD' as const,
+      text: c.body,
+      round: 0,
+      resolved: false,
+    })),
   ].sort((x, y) => x.at.localeCompare(y.at));
   const label: Record<string, { t: string; tone: 'ok' | 'bad' | 'warn' | 'neutral' }> = {
     ACCEPTED: { t: 'Accepted evidence', tone: 'ok' },
+    ACCEPTED_ANSWER: { t: 'Accepted answer', tone: 'ok' },
+    REJECTED_ANSWER: { t: 'Rejected answer', tone: 'bad' },
     REJECTED: { t: 'Rejected evidence', tone: 'bad' },
     CLARIFICATION_REQUESTED: { t: 'Requested clarification', tone: 'warn' },
     COMMENT: { t: 'Auditor comment', tone: 'neutral' },
@@ -206,9 +239,12 @@ function Thread({ a, item, onPosted }: { a: AssessmentDetail; item: ItemDetail; 
 }
 
 function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId: string; mode: Mode; onChanged: () => void }) {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, can } = useAuth();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['assessment-item', a.id, itemId], queryFn: () => assessmentsService.item(a.id, itemId) });
+  const q = useQuery({
+    queryKey: ['assessment-item', a.id, itemId],
+    queryFn: () => assessmentsService.item(a.id, itemId),
+  });
   const [upload, setUpload] = useState(false);
   const [finding, setFinding] = useState(false);
   const [clarify, setClarify] = useState(false);
@@ -235,7 +271,13 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
   const isOwnerish = a.ownerId === user?.id || hasRole('IT_OWNER', 'SYSTEM_ADMIN');
   const assignedToMe = item.assignment?.assigneeId === user?.id;
   const statusEditable = a.actions.respond && (a.status !== 'CLARIFICATION_REQUIRED' || item.clarificationOpen);
-  const editable = mode === 'respond' && statusEditable && (isOwnerish || assignedToMe);
+  const editable = mode === 'respond' && statusEditable && (isOwnerish || assignedToMe) && can('response:update');
+  // Uploading needs evidence:create on top of being able to answer; an administrator can restrict it per user.
+  const canUpload = editable && can('evidence:create');
+  const uploadRestriction = user?.restrictions?.find((r) => r.permission === 'evidence:create');
+  // The answer is already accepted when the latest answer-level decision is an acceptance made after the last change.
+  const lastAnswerDecision = item.reviews.filter((r) => !r.evidenceId && ['ACCEPTED', 'REJECTED', 'CLARIFICATION_REQUESTED'].includes(r.decision)).sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0];
+  const answerAccepted = lastAnswerDecision?.decision === 'ACCEPTED' && (!item.response || item.response.updatedAt <= lastAnswerDecision.createdAt);
   const lockedReason =
     mode !== 'respond'
       ? null
@@ -245,7 +287,9 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
           ? 'Only questions with an open clarification request can change during clarification.'
           : !isOwnerish && !assignedToMe
             ? 'This question is not assigned to you.'
-            : null;
+            : !can('response:update')
+              ? 'Your administrator has restricted you from changing answers.'
+              : null;
   const reviewing = mode === 'review' && a.actions.review;
 
   return (
@@ -267,7 +311,11 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
         {item.guidance && <p className="mt-2 rounded-md bg-info-soft px-3 py-2 text-[13px] text-info">Guidance: {item.guidance}</p>}
         {item.evidenceRequirement && (
           <p className="mt-2 rounded-md border border-line bg-subtle px-3 py-2 text-[13px] text-ink-2">
-            <span className="font-medium text-ink">Evidence expected{item.evidenceMandatory ? ' (required)' : ' (optional)'}:</span> {item.evidenceRequirement}
+            <span className="font-medium text-ink">
+              Evidence expected
+              {item.evidenceMandatory ? ' (required)' : ' (optional)'}:
+            </span>{' '}
+            {item.evidenceRequirement}
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -289,15 +337,21 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
           <h3 className="text-sm font-semibold">
             Evidence <span className="font-normal text-muted">({item.evidence.length})</span>
           </h3>
-          {editable && (
+          {canUpload && (
             <Button size="sm" variant="soft" onClick={() => setUpload(true)}>
               <Upload /> Upload evidence
             </Button>
           )}
         </div>
+        {editable && !canUpload && (
+          <p className="mb-3 rounded-md border border-warn/30 bg-warn-soft px-3 py-2 text-[13px] text-warn">
+            You can answer this question but not upload evidence
+            {uploadRestriction?.reason ? ` (${uploadRestriction.reason})` : ''}. Ask {a.owner.name} or another owner in {a.department.name} to attach the file.
+          </p>
+        )}
         <EvidenceList
           items={item.evidence}
-          canVersion={editable}
+          canVersion={canUpload}
           onChanged={refresh}
           renderActions={reviewing ? (e) => (e.versions[0]?.scanStatus === 'CLEAN' && e.verificationStatus !== 'ACCEPTED' ? <ReviewDecision a={a} item={item} evidenceId={e.id} onDone={refresh} /> : null) : undefined}
         />
@@ -306,8 +360,8 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
       {reviewing && (
         <section className="flex flex-wrap gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 p-4">
           <p className="w-full text-sm font-semibold text-brand-ink">Auditor actions for this question</p>
-          <Button size="sm" variant="soft" onClick={() => acceptAnswer.mutate()} loading={acceptAnswer.isPending}>
-            <CheckCircle2 /> Accept answer{item.response?.status === 'NOT_APPLICABLE' ? ' (N/A justification)' : ''}
+          <Button size="sm" variant="soft" disabled={answerAccepted} onClick={() => acceptAnswer.mutate()} loading={acceptAnswer.isPending}>
+            <CheckCircle2 /> {answerAccepted ? 'Answer accepted' : `Accept answer${item.response?.status === 'NOT_APPLICABLE' ? ' (N/A justification)' : ''}`}
           </Button>
           <Button size="sm" onClick={() => setClarify(true)}>
             <AlertTriangle /> Request clarification
@@ -315,9 +369,11 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
           <Button size="sm" onClick={() => setComment(true)}>
             <MessageSquare /> Add comment
           </Button>
-          <Button size="sm" variant="primary" onClick={() => setFinding(true)}>
-            <Siren /> Raise finding
-          </Button>
+          {can('finding:create') && (
+            <Button size="sm" variant="primary" onClick={() => setFinding(true)}>
+              <Siren /> Raise finding
+            </Button>
+          )}
         </section>
       )}
 
@@ -362,7 +418,16 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
       )}
 
       <UploadEvidenceDialog open={upload} onOpenChange={setUpload} link={{ assessmentId: a.id, itemId: item.id }} onUploaded={refresh} />
-      <FindingDialog open={finding} onOpenChange={setFinding} assessmentId={a.id} itemId={item.id} itemLabel={`${item.questionCode} – ${item.question.slice(0, 80)}`} siteId={a.site.id} defaultOwnerId={item.assignment?.assigneeId} />
+      <FindingDialog
+        open={finding}
+        onOpenChange={setFinding}
+        assessmentId={a.id}
+        itemId={item.id}
+        itemLabel={`${item.questionCode} – ${item.question.slice(0, 80)}`}
+        siteId={a.site.id}
+        departmentId={a.department.id}
+        defaultOwnerId={item.assignment?.assigneeId}
+      />
       <ConfirmDialog
         open={clarify}
         onOpenChange={setClarify}
@@ -371,7 +436,10 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
         reasonLabel="What needs clarifying?"
         confirmLabel="Request"
         onConfirm={async (reason) => {
-          await assessmentsService.reviewItem(a.id, item.id, { decision: 'CLARIFICATION_REQUESTED', reason });
+          await assessmentsService.reviewItem(a.id, item.id, {
+            decision: 'CLARIFICATION_REQUESTED',
+            reason,
+          });
           toast.success('Clarification requested');
           refresh();
         }}
@@ -384,7 +452,10 @@ function ItemPanel({ a, itemId, mode, onChanged }: { a: AssessmentDetail; itemId
         reasonMin={1}
         confirmLabel="Add"
         onConfirm={async (text) => {
-          await assessmentsService.reviewItem(a.id, item.id, { decision: 'COMMENT', comments: text });
+          await assessmentsService.reviewItem(a.id, item.id, {
+            decision: 'COMMENT',
+            comments: text,
+          });
           refresh();
         }}
       />
@@ -408,7 +479,8 @@ function QuestionList({ items, selected, onSelect, mode }: { items: WorkspaceIte
                   <span className="font-medium text-ink-2">{i.questionCode}</span>
                   {i.clarificationOpen && <AlertTriangle className="size-3 text-warn" />}
                   {ev > 0 && <span>· {ev} file(s)</span>}
-                  {mode === 'review' && reviewed && <span className={cn(reviewed === 'ACCEPTED' ? 'text-ok' : reviewed === 'REJECTED' ? 'text-bad' : 'text-warn')}>· {humanize(reviewed)}</span>}
+                  {mode === 'review' && !!i.reviewPending?.length && <span className="font-medium text-warn">· needs your decision</span>}
+                  {mode === 'review' && !i.reviewPending?.length && reviewed && <span className={cn(reviewed === 'ACCEPTED' ? 'text-ok' : reviewed === 'REJECTED' ? 'text-bad' : 'text-warn')}>· {humanize(reviewed)}</span>}
                 </span>
                 <span className={cn('line-clamp-2 text-[13px]', selected === i.id ? 'font-medium text-brand-ink' : 'text-ink')}>{i.question}</span>
               </span>
@@ -421,7 +493,11 @@ function QuestionList({ items, selected, onSelect, mode }: { items: WorkspaceIte
 }
 
 function SubmitDialog({ a, open, onOpenChange, onDone }: { a: AssessmentDetail; open: boolean; onOpenChange: (o: boolean) => void; onDone: (focus?: string) => void }) {
-  const v = useQuery({ queryKey: ['validation', a.id], queryFn: () => assessmentsService.validation(a.id), enabled: open });
+  const v = useQuery({
+    queryKey: ['validation', a.id],
+    queryFn: () => assessmentsService.validation(a.id),
+    enabled: open,
+  });
   const [missing, setMissing] = useState<MissingItem[] | null>(null);
   const m = useMutation({
     mutationFn: () => assessmentsService.submit(a.id),
@@ -479,11 +555,24 @@ function SubmitDialog({ a, open, onOpenChange, onDone }: { a: AssessmentDetail; 
 
 function Workspace({ mode }: { mode: Mode }) {
   const { id = '' } = useParams();
+  const { can } = useAuth();
   const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
-  const a = useQuery({ queryKey: ['assessment', id], queryFn: () => assessmentsService.get(id) });
-  const [filter, setFilter] = useState({ search: '', status: '', assignee: '', flagged: '' });
-  const items = useQuery({ queryKey: ['assessment-items', id, filter], queryFn: () => assessmentsService.items(id, filter), enabled: !!a.data });
+  const a = useQuery({
+    queryKey: ['assessment', id],
+    queryFn: () => assessmentsService.get(id),
+  });
+  const [filter, setFilter] = useState({
+    search: '',
+    status: '',
+    assignee: '',
+    flagged: '',
+  });
+  const items = useQuery({
+    queryKey: ['assessment-items', id, filter],
+    queryFn: () => assessmentsService.items(id, filter),
+    enabled: !!a.data,
+  });
   const selected = params.get('item') ?? items.data?.[0]?.id ?? null;
   const [submit, setSubmit] = useState(false);
   const [finishReview, setFinishReview] = useState(false);
@@ -494,7 +583,10 @@ function Workspace({ mode }: { mode: Mode }) {
     qc.invalidateQueries({ queryKey: ['assessment-items', id] });
     qc.invalidateQueries({ queryKey: ['validation', id] });
   };
-  const startReview = useMutation({ mutationFn: () => assessmentsService.startReview(id), onSuccess: () => (toast.success('Review started'), refresh()) });
+  const startReview = useMutation({
+    mutationFn: () => assessmentsService.startReview(id),
+    onSuccess: () => (toast.success('Review started'), refresh()),
+  });
   const review = useMutation({
     mutationFn: () => assessmentsService.submitReview(id, opinion),
     onSuccess: () => {
@@ -506,7 +598,10 @@ function Workspace({ mode }: { mode: Mode }) {
   });
   const counts = useMemo(() => {
     const all = items.data ?? [];
-    return { answered: all.filter((i) => (i.response?.status ?? 'NOT_ASSESSED') !== 'NOT_ASSESSED').length, total: all.length };
+    return {
+      answered: all.filter((i) => (i.response?.status ?? 'NOT_ASSESSED') !== 'NOT_ASSESSED').length,
+      total: all.length,
+    };
   }, [items.data]);
 
   if (a.isLoading) return <Card className="p-6"><Skeleton className="h-96 w-full" /></Card>;
@@ -550,9 +645,16 @@ function Workspace({ mode }: { mode: Mode }) {
           )}
           {mode === 'review' && as.actions.review && (
             <>
-              <Button onClick={() => setAssessmentFinding(true)}>
-                <Siren /> Assessment-level finding
-              </Button>
+              {as.reviewProgress && (
+                <span className={cn('text-[13px] tabular', as.reviewProgress.pending ? 'text-warn' : 'text-ok')}>
+                  Reviewed {as.reviewProgress.decided} of {as.reviewProgress.reviewable}
+                </span>
+              )}
+              {can('finding:create') && (
+                <Button onClick={() => setAssessmentFinding(true)}>
+                  <Siren /> Assessment-level finding
+                </Button>
+              )}
               <Button variant="primary" onClick={() => setFinishReview(true)}>
                 <ShieldCheck /> Submit review
               </Button>
@@ -616,18 +718,35 @@ function Workspace({ mode }: { mode: Mode }) {
       </Card>
 
       <SubmitDialog a={as} open={submit} onOpenChange={setSubmit} onDone={(focus) => (refresh(), focus && setParams({ item: focus }))} />
-      <FindingDialog open={assessmentFinding} onOpenChange={setAssessmentFinding} assessmentId={as.id} siteId={as.site.id} />
+      <FindingDialog open={assessmentFinding} onOpenChange={setAssessmentFinding} assessmentId={as.id} siteId={as.site.id} departmentId={as.department.id} />
       <Dialog open={finishReview} onOpenChange={setFinishReview}>
         <DialogContent>
           <DialogHeader title="Submit audit review" description={as.openClarificationCount ? `${as.openClarificationCount} question(s) have open rejections or clarification requests — the assessment will go back to the department.` : as.approvalRequired ? 'The assessment will move to Pending approval.' : 'The assessment will be marked Reviewed and can be finalised.'} />
-          <DialogBody>
-            <Field label="Overall audit opinion" required hint="Printed in the final report." htmlFor="opinion">
+          <DialogBody className="space-y-4">
+            {(() => {
+              const waiting = (items.data ?? []).filter((i) => i.reviewPending?.length);
+              return waiting.length ? (
+                <div className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2">
+                  <p className="text-sm font-medium text-warn">{waiting.length} question(s) still need your decision</p>
+                  <ul className="mt-1 max-h-40 space-y-1 overflow-y-auto text-[13px]">
+                    {waiting.map((i) => (
+                      <li key={i.id}>
+                        <button className="text-left hover:underline" onClick={() => (setFinishReview(false), setParams({ item: i.id }))}>
+                          <span className="font-medium">{i.questionCode}</span> · {i.reviewPending!.join('; ')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })()}
+            <Field label="Overall audit opinion" required hint="At least 20 characters. Printed in the final report." htmlFor="opinion">
               <Textarea id="opinion" rows={5} value={opinion} onChange={(e) => setOpinion(e.target.value)} />
             </Field>
           </DialogBody>
           <DialogFooter>
             <Button onClick={() => setFinishReview(false)}>Cancel</Button>
-            <Button variant="primary" disabled={opinion.trim().length < 5} loading={review.isPending} onClick={() => review.mutate()}>
+            <Button variant="primary" disabled={opinion.trim().length < 20 || !!as.reviewProgress?.pending} loading={review.isPending} onClick={() => review.mutate()}>
               Submit review
             </Button>
           </DialogFooter>

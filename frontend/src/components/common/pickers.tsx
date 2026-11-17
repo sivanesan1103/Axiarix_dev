@@ -8,9 +8,15 @@ import { cn, formatBytes } from '@/lib/utils';
 import { ROLE_LABEL } from '@/constants/status';
 
 /** Active-user picker backed by the directory endpoint, optionally filtered by role keys. */
-export function UserSelect({ value, onChange, roles, placeholder = 'Select a person', id, allowEmpty = true, siteId }: { value: string; onChange: (v: string) => void; roles?: string[]; placeholder?: string; id?: string; allowEmpty?: boolean; siteId?: string }) {
+/**
+ * Person picker. With siteId (and departmentId) it lists only people whose role covers that branch and
+ * department, the same rule the server applies, so a task never goes to someone who cannot open it.
+ */
+export function UserSelect({ value, onChange, roles, placeholder = 'Select a person', id, allowEmpty = true, siteId, departmentId }: { value: string; onChange: (v: string) => void; roles?: string[]; placeholder?: string; id?: string; allowEmpty?: boolean; siteId?: string; departmentId?: string }) {
   const q = useQuery({ queryKey: ['directory', roles?.join(',') ?? ''], queryFn: () => usersService.directory(roles?.join(',')) });
-  const users = (q.data ?? []).filter((u) => !siteId || u.roles.some((r) => r.siteId === null || r.siteId === siteId));
+  const users = (q.data ?? []).filter(
+    (u) => !siteId || u.roles.some((r) => (!roles || roles.includes(r.role.key)) && (r.siteId === null || r.siteId === siteId) && (!departmentId || r.departmentId === null || r.departmentId === departmentId)),
+  );
   return (
     <NativeSelect id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={q.isLoading}>
       {allowEmpty && <option value="">{q.isLoading ? 'Loading…' : placeholder}</option>}

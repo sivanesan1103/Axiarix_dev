@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { AlertTriangle, Archive, ArrowDown, ArrowUp, CheckCircle2, Download, Lock, MessageSquare, MoreHorizontal, Pencil, Plus, Send, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { checklistsService, type MappingPayload } from '@/services/checklists.service';
-import { usersService } from '@/services/users.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { errorDetails, errorMessage } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, Dropdown
 import { Field, Input, NativeSelect, Switch, Textarea } from '@/components/ui/form-controls';
 import { ConfirmDialog, EmptyState, ErrorState, LoadingRows, PageHeader, SearchInput, StatusBadge } from '@/components/common';
 import { UserSelect } from '@/components/common/pickers';
-import { CHECKLIST_STATUS, PRIORITY, ROLE_LABEL } from '@/constants/status';
+import { CHECKLIST_STATUS, PRIORITY } from '@/constants/status';
 import { cn, formatDateTime } from '@/lib/utils';
 import type { ChecklistItem, IsoReference } from '@/types/api';
 
@@ -157,6 +156,12 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
       qc.invalidateQueries({ queryKey: ['version', versionId] });
       onOpenChange(false);
     },
+    onError: (e) => {
+      // Someone submitted or published this version while the dialog was open: refresh so the page shows the lock.
+      toast.error(`${errorMessage(e)} The page has been refreshed to show the current state.`);
+      qc.invalidateQueries({ queryKey: ['version', versionId] });
+      onOpenChange(false);
+    },
   });
   const flagged = mappings.some((x) => x.needsReview);
   return (
@@ -250,19 +255,29 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
   );
 }
 
-/** People who can usually approve checklists (ISMS owners, administrators), minus the author and submitter. */
-function ReviewerSelect({ value, onChange, exclude }: { value: string; onChange: (v: string) => void; exclude: string[] }) {
-  const q = useQuery({ queryKey: ['directory', 'ISMS_OWNER,SYSTEM_ADMIN'], queryFn: () => usersService.directory('ISMS_OWNER,SYSTEM_ADMIN') });
-  const people = (q.data ?? []).filter((u) => !exclude.includes(u.id));
+/**
+ * Everyone who can approve checklists (by permission, after personal restrictions), minus the author
+ * and you. When nobody qualifies, the message says how to fix it instead of showing an empty list.
+ */
+function ReviewerSelect({ versionId, value, onChange }: { versionId: string; value: string; onChange: (v: string) => void }) {
+  const q = useQuery({ queryKey: ['eligible-reviewers', versionId], queryFn: () => checklistsService.eligibleReviewers(versionId) });
+  const people = q.data ?? [];
   return (
-    <NativeSelect id="v-reviewer" value={value} onChange={(e) => onChange(e.target.value)} disabled={q.isLoading}>
-      <option value="">{q.isLoading ? 'Loading…' : people.length ? 'Choose a reviewer' : 'No eligible reviewer'}</option>
-      {people.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.name} — {u.roles.map((r) => ROLE_LABEL[r.role.key] ?? r.role.key).join(', ')}
-        </option>
-      ))}
-    </NativeSelect>
+    <>
+      <NativeSelect id="v-reviewer" value={value} onChange={(e) => onChange(e.target.value)} disabled={q.isLoading || !people.length}>
+        <option value="">{q.isLoading ? 'Loading…' : people.length ? 'Choose a reviewer' : 'No eligible reviewer'}</option>
+        {people.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.name} — {u.roles.join(', ')}
+          </option>
+        ))}
+      </NativeSelect>
+      {!q.isLoading && !people.length && (
+        <p className="mt-2 rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+          Nobody else in this organisation can approve checklists. An administrator can give someone the ISMS / Compliance Owner role (Users → Edit details &amp; roles), or add the checklist Approve permission to a role.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -305,7 +320,6 @@ export function ChecklistEditorPage() {
   const [mappingIssues, setMappingIssues] = useState<{ questionCode: string; references: string[] }[] | null>(null);
   const [commentFor, setCommentFor] = useState<ChecklistItem | null | undefined>(undefined);
   const comments = useQuery({ queryKey: ['version-comments', versionId], queryFn: () => checklistsService.reviewComments(versionId), enabled: !!versionId });
-  const { user } = useAuth();
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['version', versionId] });
@@ -424,7 +438,7 @@ export function ChecklistEditorPage() {
                       {c.resolvedAt && ` · resolved by ${c.resolvedBy?.name ?? '—'}`}
                     </p>
                   </div>
-                  {!c.resolvedAt && ['DRAFT', 'UNDER_REVIEW'].includes(v.status) && (
+                  {c.canResolve && (
                     <Button size="sm" variant="ghost" loading={resolveComment.isPending && resolveComment.variables === c.id} onClick={() => resolveComment.mutate(c.id)}>
                       <CheckCircle2 /> Resolve
                     </Button>
@@ -575,7 +589,7 @@ export function ChecklistEditorPage() {
         }}
       >
         <Field label="Reviewer" required htmlFor="v-reviewer">
-          <ReviewerSelect value={reviewerId} onChange={setReviewerId} exclude={[user?.id, v.review.author?.id].filter((x): x is string => !!x)} />
+          <ReviewerSelect versionId={versionId} value={reviewerId} onChange={setReviewerId} />
         </Field>
       </ConfirmDialog>
       <ConfirmDialog

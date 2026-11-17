@@ -51,6 +51,7 @@ export const assessmentsService = {
   comment: (id: string, itemId: string | null, body: string) => post<Comment>(`/assessments/${id}/comments`, { itemId, body }),
   approval: (id: string, decision: 'APPROVED' | 'REJECTED', comments?: string) => post(`/assessments/${id}/approval`, { decision, comments }),
   finalise: (id: string) => post(`/assessments/${id}/finalise`),
+  changeOwner: (id: string, ownerId: string, reason: string) => post(`/assessments/${id}/owner`, { ownerId, reason }),
   reopen: (id: string, reason: string) => post(`/assessments/${id}/reopen`, { reason }),
   history: (id: string) => get<HistoryEntry[]>(`/assessments/${id}/history`),
   export: (id: string, format: 'csv' | 'xlsx') => downloadFile(`/assessments/${id}/export`, { format }, `assessment.${format}`),

@@ -16,6 +16,10 @@ export const dashboardService = {
   tasks: () =>
     get<{
       openAssignments: number;
+      myQuestions: { id: string; code: string; title: string; status: string; dueDate: string; assignedToMe: number; overdue: boolean }[];
+      toRelease: { id: string; code: string; title: string; status: string; dueDate: string }[];
+      myFindings: { id: string; code: string; title: string; status: string; severity: string; dueDate: string; overdue: boolean }[];
+      checklistReviews: { id: string; versionNumber: number; submittedAt: string | null; template: { id: string; title: string } }[];
       toSubmit: { id: string; code: string; title: string; status: string; dueDate: string }[];
       toReview: { id: string; code: string; title: string; status: string; dueDate: string }[];
       toApprove: { id: string; code: string; title: string; status: string; dueDate: string }[];

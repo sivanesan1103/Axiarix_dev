@@ -23,7 +23,7 @@ const schema = z.object({
 type Form = z.infer<typeof schema>;
 
 /** Auditor raises a finding against an assessment (optionally a specific question). */
-export function FindingDialog({ open, onOpenChange, assessmentId, itemId, itemLabel, siteId, defaultOwnerId }: { open: boolean; onOpenChange: (o: boolean) => void; assessmentId: string; itemId?: string | null; itemLabel?: string; siteId?: string; defaultOwnerId?: string }) {
+export function FindingDialog({ open, onOpenChange, assessmentId, itemId, itemLabel, siteId, departmentId, defaultOwnerId }: { open: boolean; onOpenChange: (o: boolean) => void; assessmentId: string; itemId?: string | null; itemLabel?: string; siteId?: string; departmentId?: string; defaultOwnerId?: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const due = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
@@ -74,7 +74,7 @@ export function FindingDialog({ open, onOpenChange, assessmentId, itemId, itemLa
               <Textarea id="f-com" rows={2} {...form.register('auditorComments')} />
             </Field>
             <Field label="Owner" htmlFor="f-owner" hint="Leave empty to route to the department owner.">
-              <UserSelect id="f-owner" value={form.watch('ownerId') ?? ''} onChange={(v) => form.setValue('ownerId', v)} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={siteId} placeholder="Department owner" />
+              <UserSelect id="f-owner" value={form.watch('ownerId') ?? ''} onChange={(v) => form.setValue('ownerId', v)} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={siteId} departmentId={departmentId} placeholder="Department owner" />
             </Field>
             <Field label="Due date" required error={e.dueDate?.message} htmlFor="f-due">
               <Input id="f-due" type="date" {...form.register('dueDate')} />

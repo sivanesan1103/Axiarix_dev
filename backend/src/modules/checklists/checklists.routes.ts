@@ -275,6 +275,9 @@ checklistsRouter.post('/versions/:versionId/return-to-draft', requirePermission(
 checklistsRouter.post('/versions/:versionId/publish', requirePermission('checklist:approve'), validate(transitionBody), async (req, res) =>
   ok(res, await svc.transitionVersion(req, param(req, 'versionId'), 'publish', req.body)),
 );
+checklistsRouter.get('/versions/:versionId/eligible-reviewers', requirePermission('checklist:update'), async (req, res) =>
+  ok(res, await svc.eligibleReviewers(req, param(req, 'versionId'))),
+);
 checklistsRouter.get('/versions/:versionId/review-comments', requirePermission('checklist:read'), async (req, res) =>
   ok(res, await svc.listReviewComments(req, param(req, 'versionId'))),
 );

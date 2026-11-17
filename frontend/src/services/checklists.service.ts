@@ -29,6 +29,7 @@ export interface ReviewCommentRow {
   resolvedAt: string | null;
   author: Person;
   resolvedBy: Person;
+  canResolve: boolean;
 }
 
 export const checklistsService = {
@@ -40,6 +41,7 @@ export const checklistsService = {
   publishedVersions: () => get<(ChecklistVersion & { template: { id: string; title: string } })[]>('/checklists/published-versions'),
   version: (versionId: string, params?: Record<string, unknown>) =>
     get<ChecklistVersion & { template: ChecklistTemplate; items: ChecklistItem[]; flaggedCount: number; review: VersionReview }>(`/checklists/versions/${versionId}`, { params }),
+  eligibleReviewers: (versionId: string) => get<{ id: string; name: string; email: string; designation: string | null; roles: string[] }[]>(`/checklists/versions/${versionId}/eligible-reviewers`),
   reviewComments: (versionId: string) => get<ReviewCommentRow[]>(`/checklists/versions/${versionId}/review-comments`),
   addReviewComment: (versionId: string, body: string, itemId?: string | null) => post<ReviewCommentRow>(`/checklists/versions/${versionId}/review-comments`, { body, itemId: itemId ?? null }),
   resolveReviewComment: (commentId: string) => post(`/checklists/review-comments/${commentId}/resolve`),

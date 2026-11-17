@@ -144,7 +144,10 @@ function PendingTasks() {
   const q = useQuery({ queryKey: ['dashboard', 'tasks'], queryFn: dashboardService.tasks });
   const rows: { key: string; icon: typeof ClipboardCheck; title: string; meta: string; date?: string; to: string; overdue?: boolean }[] = [];
   if (q.data) {
-    if (q.data.openAssignments) rows.push({ key: 'assign', icon: ClipboardCheck, title: `${q.data.openAssignments} question(s) assigned to you`, meta: 'My assessments', to: '/my-assessments' });
+    q.data.myQuestions.forEach((a) => rows.push({ key: `q${a.id}`, icon: ClipboardCheck, title: `Answer ${a.assignedToMe} question(s): ${a.title}`, meta: `${a.code} · assigned to you`, date: a.dueDate, to: `/my-assessments/${a.id}?assignee=me`, overdue: a.overdue }));
+    q.data.toRelease.forEach((a) => rows.push({ key: `d${a.id}`, icon: ClipboardCheck, title: `Release ${a.code} to the department`, meta: `Draft · ${a.title}`, date: a.dueDate, to: `/assessments/${a.id}` }));
+    q.data.checklistReviews.forEach((v) => rows.push({ key: `c${v.id}`, icon: ShieldCheck, title: `Review checklist: ${v.template.title} v${v.versionNumber}`, meta: 'You are the named reviewer', to: `/checklists/${v.template.id}/versions/${v.id}` }));
+    q.data.myFindings.forEach((f) => rows.push({ key: `f${f.id}`, icon: Wrench, title: `Plan action for ${f.code}`, meta: `${humanize(f.severity)} finding · ${humanize(f.status)}`, date: f.dueDate, to: `/findings/${f.id}`, overdue: f.overdue }));
     q.data.toSubmit.forEach((a) => rows.push({ key: `s${a.id}`, icon: ClipboardCheck, title: a.title, meta: `${a.code} · ${humanize(a.status)}`, date: a.dueDate, to: `/my-assessments/${a.id}` }));
     q.data.toReview.forEach((a) => rows.push({ key: `r${a.id}`, icon: ShieldCheck, title: `Review ${a.code}`, meta: humanize(a.status), date: a.dueDate, to: `/auditor/${a.id}` }));
     q.data.toApprove.forEach((a) => rows.push({ key: `p${a.id}`, icon: FileCheck2, title: `Approve ${a.code}`, meta: 'Pending approval', date: a.dueDate, to: `/assessments/${a.id}` }));
@@ -161,10 +164,10 @@ function PendingTasks() {
       ) : q.isError ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : !rows.length ? (
-        <EmptyState title="Nothing waiting on you" description="New assignments, reviews and approvals will appear here." />
+        <EmptyState title="Nothing waiting on you" description="Questions to answer, assessments to submit, reviews, approvals, findings and actions given to you appear here." />
       ) : (
         <ul className="divide-y divide-line">
-          {rows.slice(0, 7).map((r) => {
+          {rows.slice(0, 10).map((r) => {
             const d = r.date ? new Date(r.date) : null;
             return (
               <li key={r.key}>

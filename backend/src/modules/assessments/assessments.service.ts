@@ -7,7 +7,7 @@ import type { AuthUser } from '../../types/auth.js';
 import { recordAudit, recordAuditSafe } from '../../services/audit.service.js';
 import { assessmentMetrics } from '../../services/compliance.service.js';
 import { notify } from '../../services/notification.service.js';
-import { assertUnitAccess, canAccessUnit } from '../../services/scope.service.js';
+import { assertUnitAccess, assertUserCoversUnit, canAccessUnit } from '../../services/scope.service.js';
 import { getSetting, nextCode } from '../../services/settings.service.js';
 import { recordTransition } from '../../services/workflow.service.js';
 import { parsePeriod, PERIOD_FORMAT_HINT } from '../../utils/period.js';
@@ -93,8 +93,7 @@ export async function createAssessment(req: Request, input: CreateAssessmentInpu
     include: { items: { where: { status: 'ACTIVE' }, select: { id: true, defaultOwnerId: true } } },
   });
   if (!version) throw validationError('Only a published checklist version can be used for an assessment');
-  const owner = await prisma.user.findFirst({ where: { id: input.ownerId, organisationId: user.organisationId, status: 'ACTIVE' } });
-  if (!owner) throw badRequest('Owner not found or inactive');
+  const owner = await assertUserCoversUnit({ organisationId: user.organisationId, siteId: input.siteId, departmentId: input.departmentId }, input.ownerId, 'assessment owner');
   const period = parsePeriod(input.periodLabel);
   if (!period) throw validationError(PERIOD_FORMAT_HINT, { fieldErrors: { periodLabel: [PERIOD_FORMAT_HINT] } });
   input = { ...input, periodLabel: period.label, periodStart: period.start, periodEnd: period.end };
@@ -142,8 +141,7 @@ export async function updateAssessment(req: Request, id: string, input: Partial<
   const a = await loadAssessment(req, id);
   if (!['DRAFT', 'ASSIGNED'].includes(a.status)) throw invalidState('Assessment details can only be edited before work starts');
   if (input.ownerId) {
-    const owner = await prisma.user.findFirst({ where: { id: input.ownerId, organisationId: a.organisationId, status: 'ACTIVE' } });
-    if (!owner) throw badRequest('Owner not found or inactive');
+    await assertUserCoversUnit(a, input.ownerId, 'assessment owner');
   }
   const { assignDefaultOwners: _ignored, ...rest } = input;
   void _ignored;
@@ -175,16 +173,29 @@ export async function releaseAssessment(req: Request, id: string) {
   return prisma.assessment.findUniqueOrThrow({ where: { id } });
 }
 
+/**
+ * Hands an open assessment to a different owner (wrong owner chosen, owner left, workload moved).
+ * The new owner must work in the assessment's branch and department. Recorded with a reason; the
+ * new owner is notified. Other details stay locked once work has started.
+ */
+export async function changeOwner(req: Request, id: string, ownerId: string, reason: string) {
+  const a = await loadAssessment(req, id);
+  if (!['DRAFT', ...EDITABLE_STATUSES].includes(a.status)) throw invalidState('The owner can only be changed while the assessment is open');
+  if (ownerId === a.ownerId) throw badRequest('This person already owns the assessment');
+  const owner = await assertUserCoversUnit(a, ownerId, 'assessment owner');
+  await prisma.$transaction(async (tx) => {
+    await tx.assessment.update({ where: { id }, data: { ownerId } });
+    await recordAudit({ req, action: 'ASSESSMENT_OWNER_CHANGED', entityType: 'Assessment', entityId: id, siteId: a.siteId, metadata: { from: a.ownerId, to: ownerId, reason } }, tx);
+  });
+  await notify({ userIds: [ownerId], type: 'ASSIGNMENT_CREATED', title: `You now own ${a.code}`, body: `${a.title}. Reason: ${reason}`, link: `/my-assessments/${a.id}` });
+  return { ...a, ownerId: owner.id };
+}
+
 /** Assigns or reassigns a group of questions to one owner. */
 export async function assignItems(req: Request, id: string, itemIds: string[], assigneeId: string, dueDate?: Date | null) {
   const a = await loadAssessment(req, id);
   if (!['DRAFT', ...EDITABLE_STATUSES].includes(a.status)) throw invalidState('Questions can only be assigned while the assessment is open');
-  const assignee = await prisma.user.findFirst({ where: { id: assigneeId, organisationId: a.organisationId, status: 'ACTIVE' }, include: { roles: true } });
-  if (!assignee) throw badRequest('Assignee not found or inactive');
-  const assigneeScoped = assignee.roles.some(
-    (r) => (r.siteId === null || r.siteId === a.siteId) && (r.departmentId === null || r.departmentId === a.departmentId),
-  );
-  if (!assigneeScoped) throw badRequest('Assignee has no access to this site/department');
+  await assertUserCoversUnit(a, assigneeId, 'person answering these questions');
   const valid = await prisma.checklistItem.count({ where: { id: { in: itemIds }, versionId: a.checklistVersionId } });
   if (valid !== new Set(itemIds).size) throw badRequest('Some questions do not belong to this assessment');
 
@@ -221,6 +232,56 @@ export async function openClarificationItemIds(assessmentId: string, round: numb
     select: { itemId: true },
   });
   return new Set(reviews.map((r) => r.itemId!));
+}
+
+export interface PendingReview {
+  itemId: string;
+  questionCode: string;
+  question: string;
+  problems: string[];
+}
+
+/**
+ * What the auditor still has to decide in the current round before the review can be submitted.
+ * Every answered question needs a live decision (accepted, or an open rejection / clarification
+ * request), and every evidence file on it must be accepted or rejected. A clarification the
+ * department has since answered (resolved) needs a fresh decision; so does newly uploaded evidence.
+ */
+export async function reviewCoverage(a: { id: string; checklistVersionId: string }, db: Tx = prisma) {
+  const [items, responses, reviews, evidence] = await Promise.all([
+    db.checklistItem.findMany({ where: { versionId: a.checklistVersionId, status: 'ACTIVE' }, select: { id: true, questionCode: true, question: true }, orderBy: { sequence: 'asc' } }),
+    db.assessmentResponse.findMany({ where: { assessmentId: a.id }, select: { itemId: true, status: true, updatedAt: true } }),
+    db.auditorReview.findMany({
+      where: { assessmentId: a.id, itemId: { not: null }, decision: { in: ['ACCEPTED', 'REJECTED', 'CLARIFICATION_REQUESTED'] } },
+      select: { itemId: true, decision: true, resolvedAt: true, evidenceId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    db.evidence.findMany({ where: { assessmentId: a.id, deletedAt: null, itemId: { not: null } }, select: { itemId: true, verificationStatus: true } }),
+  ]);
+  const pending: PendingReview[] = [];
+  const acceptedAnswers = new Set<string>();
+  let reviewable = 0;
+  for (const item of items) {
+    const response = responses.find((r) => r.itemId === item.id);
+    const status = response?.status ?? 'NOT_ASSESSED';
+    if (status === 'NOT_ASSESSED') continue;
+    reviewable++;
+    // The latest decision on the answer itself counts, across rounds, unless the answer changed after
+    // it was made. Decisions on evidence files are separate: accepting a file does not accept the answer.
+    // A rejection or clarification request (on the answer or on a file) that is still open also counts:
+    // the question goes back to the department.
+    const latestAnswer = reviews.find((r) => r.itemId === item.id && !r.evidenceId);
+    const latest = reviews.find((r) => r.itemId === item.id);
+    const accepted = !!latestAnswer && latestAnswer.decision === 'ACCEPTED' && (!response || response.updatedAt <= latestAnswer.createdAt);
+    if (accepted) acceptedAnswers.add(item.id);
+    const decided = accepted || (!!latest && latest.decision !== 'ACCEPTED' && !latest.resolvedAt);
+    const undecidedFiles = evidence.filter((e) => e.itemId === item.id && e.verificationStatus === 'PENDING').length;
+    const problems: string[] = [];
+    if (!decided) problems.push(latest ? 'Answer changed or clarification answered since your last decision' : 'No decision on this answer yet');
+    if (undecidedFiles) problems.push(`${undecidedFiles} evidence file(s) not accepted or rejected`);
+    if (problems.length) pending.push({ itemId: item.id, questionCode: item.questionCode, question: item.question, problems });
+  }
+  return { reviewable, decided: reviewable - pending.length, pending, acceptedAnswers };
 }
 
 /**
@@ -370,11 +431,17 @@ export async function submitReview(req: Request, id: string, opinion: string) {
   if (workflow.requireAuditorAcceptanceForNA) {
     // Every Not Applicable answer must carry an explicit auditor acceptance in this round (BRD §8).
     const na = await prisma.assessmentResponse.findMany({ where: { assessmentId: id, status: 'NOT_APPLICABLE' }, include: { item: { select: { questionCode: true } } } });
-    const accepted = await prisma.auditorReview.findMany({ where: { assessmentId: id, round: a.round, decision: 'ACCEPTED', evidenceId: null, itemId: { in: na.map((r) => r.itemId) } }, select: { itemId: true } });
-    const pending = na.filter((r) => !open.has(r.itemId) && !accepted.some((x) => x.itemId === r.itemId));
+    // An explicit acceptance of the N/A answer itself, still valid (the answer has not changed since).
+    const { acceptedAnswers } = await reviewCoverage(a);
+    const pending = na.filter((r) => !open.has(r.itemId) && !acceptedAnswers.has(r.itemId));
     if (pending.length) {
       throw validationError(`${pending.length} Not Applicable answer(s) need your explicit acceptance before the review can be submitted`, { pendingNA: pending.map((r) => ({ itemId: r.itemId, questionCode: r.item.questionCode })) });
     }
+  }
+  // An audit review is only complete when the auditor has looked at every answer and every evidence file.
+  const coverage = await reviewCoverage(a);
+  if (coverage.pending.length) {
+    throw validationError(`${coverage.pending.length} question(s) still need your decision before the review can be submitted`, { pendingReview: coverage.pending });
   }
   let next: AssessmentStatus;
   await prisma.$transaction(async (tx) => {
@@ -472,6 +539,7 @@ export async function allowedActions(req: Request, a: { id: string; status: Asse
       ...(approveBlock && ['PENDING_APPROVAL', 'REVIEWED'].includes(a.status) && p('assessment:approve') ? { approve: approveBlock } : {}),
     } as Record<string, string>,
     edit: p('assessment:update') && ['DRAFT', 'ASSIGNED'].includes(a.status),
+    changeOwner: p('assessment:update') && ['DRAFT', ...EDITABLE_STATUSES].includes(a.status),
     release: p('assessment:update') && a.status === 'DRAFT',
     assign: p('assessment:assign') && ['DRAFT', ...EDITABLE_STATUSES].includes(a.status),
     respond: p('response:update') && EDITABLE_STATUSES.includes(a.status),

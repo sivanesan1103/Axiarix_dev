@@ -17,7 +17,7 @@ export function DialogContent({ className, children, size = 'md', ...props }: Re
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-[1px] data-[state=open]:animate-in" />
       <DialogPrimitive.Content
-        className={cn('fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-pop', width, className)}
+        className={cn('fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-pop [&>form]:flex [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex-col', width, className)}
         {...props}
       >
         {children}
@@ -38,7 +38,7 @@ export function DialogHeader({ title, description }: { title: string; descriptio
   );
 }
 
-export const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('flex-1 overflow-y-auto px-6 py-5 scrollbar-thin', className)} {...props} />;
+export const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin', className)} {...props} />;
 export const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn('flex items-center justify-end gap-2 border-t border-line bg-subtle/60 px-6 py-3.5 rounded-b-lg', className)} {...props} />;
 
 /** Right-hand drawer (used for record details). */

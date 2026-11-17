@@ -124,7 +124,7 @@ findingsRouter.patch('/:id', requirePermission('finding:update'), validate(findi
 findingsRouter.post('/:id/assign', requirePermission('finding:assign'), validate(z.object({ ownerId: z.string().uuid(), dueDate: z.coerce.date().nullable().optional() })), async (req, res) =>
   ok(res, await svc.assignFinding(req, param(req, 'id'), req.body.ownerId, req.body.dueDate)),
 );
-findingsRouter.post('/:id/actions', requirePermission('corrective_action:create', 'finding:update'), validate(actionSchema), async (req, res) =>
+findingsRouter.post('/:id/actions', requirePermission('corrective_action:create', 'finding:update', 'corrective_action:update') /* finding owners plan their own actions; the service checks ownership */, validate(actionSchema), async (req, res) =>
   created(res, await svc.createAction(req, param(req, 'id'), req.body)),
 );
 findingsRouter.post(

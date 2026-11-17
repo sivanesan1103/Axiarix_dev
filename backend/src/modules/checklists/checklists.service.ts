@@ -297,13 +297,37 @@ export async function transitionVersion(
 
 // ───────────── Review comments and mapping resolution ─────────────
 
+/**
+ * People who may review this version: active members of the organisation whose effective permissions
+ * (role permissions minus personal restrictions) include checklist:approve, excluding the author and
+ * the person asking. Based on permission, not role name, so custom role setups work too.
+ */
+export async function eligibleReviewers(req: Request, versionId: string) {
+  const version = await getVersionForOrg(versionId, req.user!.organisationId);
+  const now = new Date();
+  const users = await prisma.user.findMany({
+    where: {
+      organisationId: req.user!.organisationId,
+      status: 'ACTIVE',
+      isPlatformOwner: false,
+      id: { notIn: [req.user!.id, version.createdById].filter((x): x is string => !!x) },
+      roles: { some: { role: { permissions: { some: { permission: { key: 'checklist:approve' } } } } } },
+      NOT: { restrictions: { some: { permission: { key: 'checklist:approve' }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } },
+    },
+    select: { id: true, name: true, email: true, designation: true, roles: { select: { role: { select: { key: true, name: true } } } } },
+    orderBy: { name: 'asc' },
+  });
+  return users.map((u) => ({ id: u.id, name: u.name, email: u.email, designation: u.designation, roles: [...new Set(u.roles.map((r) => r.role.name))] }));
+}
+
 export async function listReviewComments(req: Request, versionId: string) {
-  await getVersionForOrg(versionId, req.user!.organisationId);
+  const version = await getVersionForOrg(versionId, req.user!.organisationId);
   const comments = await prisma.checklistReviewComment.findMany({ where: { versionId }, orderBy: { createdAt: 'asc' }, include: { item: { select: { id: true, questionCode: true } } } });
   const ids = [...new Set(comments.flatMap((c) => [c.authorId, c.resolvedById]).filter((x): x is string => !!x))];
   const people = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
   const name = (id: string | null) => (id ? (people.find((p) => p.id === id) ?? null) : null);
-  return comments.map((c) => ({ ...c, author: name(c.authorId), resolvedBy: name(c.resolvedById) }));
+  const open = ['DRAFT', 'UNDER_REVIEW'].includes(version.status);
+  return comments.map((c) => ({ ...c, author: name(c.authorId), resolvedBy: name(c.resolvedById), canResolve: open && !c.resolvedAt && (c.authorId === req.user!.id || version.reviewerId === req.user!.id) }));
 }
 
 export async function addReviewComment(req: Request, versionId: string, input: { itemId?: string | null; body: string }) {
@@ -321,6 +345,10 @@ export async function resolveReviewComment(req: Request, commentId: string) {
   const version = await getVersionForOrg(c.versionId, req.user!.organisationId);
   if (!['DRAFT', 'UNDER_REVIEW'].includes(version.status)) throw invalidState('This version is no longer open for review');
   if (c.resolvedAt) return c;
+  // The reviewer decides when a review point is dealt with: only the comment's author or the named reviewer may resolve it.
+  if (c.authorId !== req.user!.id && version.reviewerId !== req.user!.id) {
+    throw forbidden('Only the person who wrote this comment or the named reviewer can resolve it. Reply by fixing the question, then ask them to resolve it.');
+  }
   const updated = await prisma.checklistReviewComment.update({ where: { id: commentId }, data: { resolvedAt: new Date(), resolvedById: req.user!.id } });
   await recordAudit({ req, action: 'CHECKLIST_REVIEW_COMMENT_RESOLVED', entityType: 'ChecklistVersion', entityId: c.versionId, metadata: { commentId } });
   return updated;
