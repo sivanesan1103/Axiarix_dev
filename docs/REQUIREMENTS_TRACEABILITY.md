@@ -4,7 +4,7 @@ Checked on 17 November 2026 against `Axiarix_ISO27001_2022_BRD_Hospital_IT_Pilot
 
 **How each item was checked**
 
-- **Test:** an automated test in `backend/tests/*.test.ts` (78 tests), `frontend/tests/unit` (11) or the Playwright browser test `frontend/tests/e2e/workflow.spec.ts` (2). All pass.
+- **Test:** an automated test in `backend/tests/*.test.ts` (81 tests), `frontend/tests/unit` (11) or the Playwright browser test `frontend/tests/e2e/workflow.spec.ts` (2). All pass.
 - **Live:** done by hand in the running app in Chrome with the Meridian Diagnostics users, or by calling the running API.
 - **Deployment:** met by how the system is hosted; `docs/DEPLOYMENT.md` gives the steps. It can't be shown on a developer laptop.
 
@@ -92,7 +92,7 @@ The photographed note in the project folder lists 8 points; each maps to the BRD
 | FR-016 | BR-06 | Root cause, correction, corrective action, target date, progress | **Plan corrective action**, **Update progress** | `workflow.test › AT-07, AT-08` | ✅ |
 | FR-017 | BR-06 | Reviewer accepts or returns the action | **Verify closure** / **Return** | `workflow.test › AT-08` | ✅ |
 | FR-018 | BR-10 | Lifecycle statuses with time and actor | `StatusTransition` table; History tabs | `workflow.test` | ✅ |
-| FR-019 | — | Notify about assignment, due date, clarification, finding, approval | In-app notifications and e-mail (Mailpit locally); deadline reminders every 6 hours | `workflow.test › AT-06` (owner notified); live notifications in the Meridian run | ✅ |
+| FR-019 | — | Notify about assignment, due date, clarification, finding, approval | In-app notifications and e-mail (Mailpit locally); deadline reminders every 6 hours; notifications and Pending tasks appear instantly through real-time updates | `workflow.test › AT-06` (owner notified); live notifications in the Meridian run | ✅ |
 | FR-020 | BR-08 | Dashboard: progress, compliance, coverage, findings | Dashboard | `workflow.test › AT-12` | ✅ |
 | FR-021 | BR-09 | Filter by period, site, department, clause/control and status | Scope button (branch, period), **department filter (added)**, clause/Annex A switch, status filter | `requirements.test › FR-021`; live | ✅ |
 | FR-022 | BR-07 | Final PDF after required review/approval | `generateFinalReport` | `workflow.test › AT-09` | ✅ |

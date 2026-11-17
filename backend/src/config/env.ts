@@ -17,7 +17,7 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(30),
   /** API requests per minute per client address (protects against floods; raise for large sites). */
-  API_RATE_LIMIT: z.coerce.number().int().positive().default(600),
+  API_RATE_LIMIT: z.coerce.number().int().positive().optional(),
   /** Number of reverse proxies in front of the API (load balancer + nginx = 2), so the real client address is used. */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).optional(),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),

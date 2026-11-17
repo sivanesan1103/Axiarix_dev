@@ -58,7 +58,8 @@ export function refreshAccessToken(): Promise<string | null> {
         return accessToken;
       } catch (e) {
         const status = axios.isAxiosError(e) ? e.response?.status : undefined;
-        const transient = status === undefined || status >= 500;
+        // 429 (rate limited) is temporary too: retry instead of signing the user out.
+        const transient = status === undefined || status >= 500 || status === 429;
         if (!transient || attempt >= RETRY_DELAYS_MS.length) {
           accessToken = null;
           return null;

@@ -9,6 +9,7 @@
 | Backend integration – governance | Vitest + Supertest | `backend/tests/governance.test.ts` | Platform owner creates an organisation from the setup workbook; organisations kept apart; per-user restrictions; branch administrators; separation of duties for checklists and assessments; assignees limited to the record's department; Change owner; reviewer list and comment resolution |
 | Backend integration – requirements | Vitest + Supertest | `backend/tests/requirements.test.ts` | SRS items outside AT-01 … AT-12: checklist question search (FR-027), display time zone (SRS 2.3, NFR-10), repeated submission accepted once (SRS §10), department filter and breakdown (FR-021) |
 | Backend integration – flows | Vitest + Supertest | `backend/tests/flows.test.ts` | Branches outside the main path: approval rejected and re-approved, finalise without approval, closure evidence returned and fixed, checklist returned to draft, unassigning, retention → two-person deletion kept inside one organisation, schedules, enforced MFA (blocked until enrolled; cannot switch off; admin must enrol before enabling) |
+| Backend integration – real time | Vitest + live HTTP server | `backend/tests/realtime.test.ts` | Stream requires sign-in; changes reach the organisation only (another organisation hears nothing); only area and ids are sent; notifications and access changes reach the right user |
 | Load (NFR-01) | Node script | `backend/scripts/load-test.mjs` (`npm run test:load`) | Simultaneous users load the API behind the main pages; reports p50/p95/p99 and whether 95 % finish under 3 s |
 | Backend integration – workflow | Vitest + Supertest | `backend/tests/workflow.test.ts` | AT-01 … AT-12 (every answer and file needs an auditor decision; a contributor who owns a finding plans its action), Excel import incl. duplicate detection, published-version immutability (service and DB trigger), malware/executable/disguised upload rejection, N/A acceptance rule, report immutability, CSV formula-injection protection, audit chain after the full workflow |
 | Frontend unit | Vitest + React Testing Library | `frontend/tests/unit` | Formatting helpers, empty-param cleaning, password policy, status badges, confirm dialog mandatory reason and error display, lifecycle stepper conditional stages, mapping chips |
@@ -64,7 +65,7 @@ Every BRD and SRS requirement is mapped to code, tests and results in [REQUIREME
 
 | Check | Result |
 |---|---|
-| Backend tests | **78 passed**, 0 failed, 0 skipped (6 files) |
+| Backend tests | **81 passed**, 0 failed, 0 skipped (7 files) |
 | Load test (50 users, 30 s) | 23,849 requests, 0 errors, p95 104 ms, max 328 ms (200 users: p95 424 ms) |
 | Frontend unit tests | **11 passed**, 0 failed |
 | Playwright E2E | **2 passed**, 0 failed (run twice) |

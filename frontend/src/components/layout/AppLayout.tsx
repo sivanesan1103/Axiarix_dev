@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, ChevronDown, ChevronRight, Crosshair, LogOut, Menu, Moon, PanelLeft, Search, Settings as SettingsIcon, Sun, X } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/display';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger, Tooltip, TooltipProvider } from '@/components/ui/overlays';
 import { cn, relativeTime } from '@/lib/utils';
 import { ROLE_LABEL } from '@/constants/status';
+import { useRealtime } from '@/hooks/useRealtime';
 import { MfaEnrolmentGate } from './MfaEnrolmentGate';
 import { GROUP_LABEL, NAV, SEGMENT_LABEL, type NavItem } from './nav';
 
@@ -432,7 +433,7 @@ function ProfileMenu() {
 }
 
 export function AppLayout() {
-  const { user } = useAuth();
+  const { user, reload } = useAuth();
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1';
@@ -456,6 +457,9 @@ export function AppLayout() {
   // While MFA enrolment is required the server refuses everything else, so only the gate is shown.
   const gated = !!user?.mfaEnrolmentRequired;
   const inOrg = !user?.isPlatformOwner && !gated;
+  // Live updates: other people's changes appear without reloading the page.
+  const reloadProfile = useCallback(() => void reload().catch(() => undefined), [reload]);
+  const live = useRealtime(!!user && !gated, reloadProfile, user?.id);
   return (
     <TooltipProvider>
       {inOrg && <ScopeUrlSync />}
@@ -477,6 +481,14 @@ export function AppLayout() {
             {inOrg && <GlobalSearch />}
             <div className="ml-auto flex items-center gap-1.5">
               {inOrg && <ScopeButton />}
+              {!gated && (
+                <Tooltip content={live ? 'Live: changes by others appear automatically' : 'Reconnecting live updates…'}>
+                  <span className="hidden items-center gap-1.5 rounded-full px-2 py-1 text-xs text-muted sm:inline-flex" aria-live="polite">
+                    <span className={cn('size-2 rounded-full', live ? 'bg-ok' : 'bg-warn animate-pulse')} />
+                    {live ? 'Live' : 'Offline'}
+                  </span>
+                </Tooltip>
+              )}
               {!gated && <Notifications />}
               <ThemeToggle />
               <div className="mx-1.5 hidden h-7 w-px bg-line sm:block" />

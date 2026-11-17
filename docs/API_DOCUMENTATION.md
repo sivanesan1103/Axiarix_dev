@@ -44,7 +44,7 @@
 | PATCH | `/users/:id` | user:update |
 | POST | `/users/:id/status` | user:update – `{ status, reason }`, revokes sessions on deactivation |
 | PUT | `/users/:id/roles` | role:assign – role and scope assignments (branch administrators only inside their branch; nobody changes their own access) |
-| PUT | `/users/:id/restrictions` | role:assign / user:assign – `{ restrictions: [{ permission, reason, expiresAt? }] }` removes permissions from this person only |
+| PUT | `/users/:id/restrictions` | role:assign / user:assign – `{ restrictions: [{ permission, expiresAt? }], reason }` replaces the permissions removed from this person only |
 | GET | `/roles` · `/roles/permissions` | role:read |
 | PUT | `/roles/:id/permissions` | role:update (System Administrator is protected) |
 
@@ -137,6 +137,7 @@
 | GET | `/dashboard/tasks` | personal pending work: drafts to release, assessments to submit, questions to answer, reviews and approvals (filtered by separation of duties), checklist reviews, findings to fix, actions to verify |
 | GET | `/audit-logs?…&format=csv\|xlsx` · `/audit-logs/actions` · `/audit-logs/verify` | audit_log:read / export |
 | GET | `/notifications` · POST `/notifications/:id/read` · `/notifications/read-all` | |
+| GET | `/events` | Real-time stream (`text/event-stream`, Bearer token). Messages: `{ type: 'change', resource, id, actorId }` to the whole organisation after any saved change; `{ type: 'notification' }` and `{ type: 'profile' }` to one user. No record data is sent |
 | GET | `/search?q=` | global search within scope: assessments, findings, checklists, checklist questions, reports, evidence |
 | GET/PUT | `/admin/settings[/:key]` | per organisation: `upload.policy`, `workflow.policy`, `security.policy`, `notification.policy`, `report.config`, `locale.config` (`{ timeZone }`, IANA name) |
 | GET | `/admin/setup-status` | Admin Home checklist: branches, departments with owners, users, published checklist, assessments |

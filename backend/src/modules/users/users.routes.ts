@@ -1,3 +1,4 @@
+import { disconnectUser } from '../../services/realtime.service.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
@@ -193,6 +194,7 @@ usersRouter.post(
       return u;
     });
     await recordAudit({ req, action: req.body.status === 'INACTIVE' ? 'USER_DEACTIVATED' : 'USER_ACTIVATED', entityType: 'User', entityId: id, metadata: { reason: req.body.reason } });
+    if (req.body.status === 'INACTIVE') disconnectUser(id);
     ok(res, withManageFlag(req.user!, user));
   },
 );

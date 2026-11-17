@@ -46,6 +46,7 @@ Startup without Docker: `cd backend && npm ci && npm run build && npx prisma mig
 - **Logs:** one JSON line per request on stdout (request id, path, status, latency, user). Ship them to the hospital SIEM.
 - **Audit integrity:** run `GET /api/v1/audit-logs/verify` periodically and export the audit trail (CSV) to protected archival storage for stronger tamper resistance (NFR-SEC-06).
 - **Reminders:** deadline reminders run every 6 hours inside the API process, and on demand from Settings.
+- **Real-time updates:** browsers keep a long-lived connection to `/api/v1/events`. The bundled `nginx.conf` turns off buffering for it; any other proxy or load balancer must also allow long-lived, unbuffered responses (idle timeout ≥ 60 s; the API sends a keep-alive every 25 s). The live hub is in memory, so run one API instance, or add a shared channel before scaling out.
 
 ## Backup & restore (NFR-SEC-09, NFR-07)
 

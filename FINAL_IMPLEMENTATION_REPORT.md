@@ -13,9 +13,10 @@ Since this report was first written (13 November), the following has been added 
 - **Task flow:** work can only be given to people in the record's branch and department; **Change owner** for open assessments; Pending tasks cover every kind of work; finding owners of any role plan corrective actions.
 - **Audit review:** every answer and evidence file needs a decision before the review can be submitted; accepting a file does not accept the answer.
 - **Requirement gaps closed on 17 Nov:** search covers checklist questions (FR-027); dashboard department filter and per-department comparison (FR-021, BRD §9); configurable display time zone used on screens and in PDF reports (SRS 2.3, NFR-10).
-- **Tests now:** backend 78 passed (6 files), frontend unit 11, Playwright 2 (run twice); lint and type checks clean. Whole workflow run by hand in Chrome with five users of a second organisation (Meridian Diagnostics).
+- **Tests now:** backend 81 passed (7 files), frontend unit 11, Playwright 2 (run twice); lint and type checks clean. Whole workflow run by hand in Chrome with five users of a second organisation (Meridian Diagnostics).
 - **NFR-01 load test** (`npm run test:load`): 50 simultaneous users — 23,849 requests in 30 s, 0 errors, p95 104 ms, slowest 328 ms; 200 users — p95 424 ms.
 - **Enforced MFA** for privileged roles (NFR-SEC-04), off by default.
+- **Real-time updates:** changes by others (tasks, answers, reviews, findings, notifications) appear on every open screen within about a second, via a Server-Sent Events stream; checked in Chrome between Meridian users.
 - **Workflow branches tested** (`flows.test.ts`): approval rejection, finalise without approval, returned closure evidence, checklist return to draft, unassigning, retention with two-person deletion, schedules.
 - **Defects fixed:** deletion requests are now kept inside their organisation; `TRUST_PROXY` and `API_RATE_LIMIT` are configurable so users behind a load balancer do not share one rate limit.
 

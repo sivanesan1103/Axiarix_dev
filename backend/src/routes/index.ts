@@ -1,3 +1,4 @@
+import { announceChanges, subscribe } from '../services/realtime.service.js';
 import { Router } from 'express';
 import { prisma } from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
@@ -49,6 +50,9 @@ apiRouter.use('/reports', reportsRouter);
 
 const protectedRouter = Router();
 protectedRouter.use(authenticate);
+protectedRouter.use(announceChanges);
+// Real-time updates (Server-Sent Events): one long-lived stream per open browser.
+protectedRouter.get('/events', subscribe);
 protectedRouter.use('/organisations', organisationsRouter);
 protectedRouter.use('/users', usersRouter);
 protectedRouter.use('/roles', rolesRouter);

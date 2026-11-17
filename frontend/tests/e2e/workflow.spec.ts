@@ -41,8 +41,9 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await isms.waitForTimeout(800);
   await shot(isms, '02-dashboard');
 
-  await isms.goto('/checklists');
-  await expect(isms.getByText('Kauvery Vadapalani IT – Internal Audit Checklist')).toBeVisible();
+  // Search rather than rely on the first page: every E2E run adds a checklist.
+  await isms.goto('/checklists?search=Kauvery%20Vadapalani');
+  await expect(isms.locator('tbody').getByText('Kauvery Vadapalani IT – Internal Audit Checklist')).toBeVisible();
   await shot(isms, '03-checklist-library');
   await isms.getByRole('button', { name: 'New checklist' }).click();
   await isms.locator('#c-title').fill(CHECKLIST);
@@ -136,8 +137,8 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await expect(auditor.locator('h1')).toContainText('Pending approval'); // the status badge, not the progress-bar label
 
   // ── IT owner: corrective action with closure evidence ──
-  await it.goto('/findings');
-  await it.getByText(`File-server restore not yet in DR plan ${stamp}`).click();
+  await it.goto(`/findings?search=${stamp}`);
+  await it.locator('tbody').getByText(`File-server restore not yet in DR plan ${stamp}`).click();
   await it.getByRole('button', { name: 'Plan corrective action' }).click();
   await dialog(it).locator('#ca-rc').fill('DR plan template omitted file shares');
   await dialog(it).locator('#ca-ca').fill('Add file-server restore steps to the DR plan and include in quarterly drill');
@@ -184,7 +185,7 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await isms.goto('/evidence');
   await expect(isms.getByText('restore-drill-q3.pdf').first()).toBeVisible();
   await shot(isms, '06-evidence-repository');
-  await isms.goto('/reports');
+  await isms.goto(`/reports?search=${encodeURIComponent(stamp)}`);
   const row = isms.getByRole('row', { name: new RegExp(ASSESSMENT) });
   await expect(row).toBeVisible();
   await shot(isms, '10-reports');
@@ -204,8 +205,10 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
 
 test('cross-branch user cannot open another branch assessment (AT-10 in the UI)', async ({ browser }) => {
   const isms = await loginAs(browser, 'isms@axiarix.local');
-  await isms.goto('/assessments');
-  await isms.getByText('ASM-2026-0001').click();
+  // Search rather than rely on the first page: E2E runs keep adding assessments.
+  await isms.goto('/assessments?search=ASM-2026-0001');
+  await isms.locator('tbody').getByText('ASM-2026-0001').click();
+  await expect(isms).toHaveURL(/\/assessments\/[0-9a-f-]{36}$/);
   const id = isms.url().split('/').pop()!;
   const other = await loginAs(browser, 'itowner.alwarpet@axiarix.local');
   await other.goto(`/my-assessments/${id}`);
