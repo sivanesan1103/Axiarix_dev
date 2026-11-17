@@ -220,6 +220,7 @@ function RegionalCard({ s, canEdit }: { s: Settings; canEdit: boolean }) {
 }
 
 function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
+  const { user } = useAuth();
   const [wf, setWf] = useState(s['workflow.policy']);
   const [up, setUp] = useState(s['upload.policy']);
   const [sec, setSec] = useState(s['security.policy']);
@@ -247,7 +248,13 @@ function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
       <Card>
         <CardHeader title="Security policy" actions={canEdit && <SaveSetting k="security.policy" value={sec} />} />
         <CardBody className="space-y-4">
-          {row('Enforce MFA for privileged roles', 'Administrators, ISMS owners and auditors are prompted to enrol at sign-in.', sec.enforceMfaForPrivileged, (c) => setSec({ ...sec, enforceMfaForPrivileged: c }))}
+          {row(
+            'Enforce MFA for privileged roles',
+            'Administrators, ISMS owners and auditors must set up two-step verification before they can use the system.',
+            sec.enforceMfaForPrivileged,
+            (c) => (c && !user?.mfaEnabled ? toast.error('Set up two-step verification on your own account first (Profile & security).') : setSec({ ...sec, enforceMfaForPrivileged: c })),
+          )}
+          {!user?.mfaEnabled && !sec.enforceMfaForPrivileged && <p className="text-xs text-muted">To switch this on, first set up two-step verification for your own account under Profile &amp; security, so you are not locked out.</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Failed sign-ins before lock-out">
               <Input type="number" min={3} max={20} disabled={!canEdit} value={sec.maxFailedLogins} onChange={(e) => setSec({ ...sec, maxFailedLogins: Number(e.target.value) })} />

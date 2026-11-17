@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/display';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger, Tooltip, TooltipProvider } from '@/components/ui/overlays';
 import { cn, relativeTime } from '@/lib/utils';
 import { ROLE_LABEL } from '@/constants/status';
+import { MfaEnrolmentGate } from './MfaEnrolmentGate';
 import { GROUP_LABEL, NAV, SEGMENT_LABEL, type NavItem } from './nav';
 
 const SIDEBAR_KEY = 'axiarix.sidebar.expanded';
@@ -452,12 +453,14 @@ export function AppLayout() {
       }),
     [],
   );
-  const inOrg = !user?.isPlatformOwner;
+  // While MFA enrolment is required the server refuses everything else, so only the gate is shown.
+  const gated = !!user?.mfaEnrolmentRequired;
+  const inOrg = !user?.isPlatformOwner && !gated;
   return (
     <TooltipProvider>
       {inOrg && <ScopeUrlSync />}
       <div className="flex min-h-screen bg-surface">
-        <Sidebar expanded={expanded} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+        {!gated && <Sidebar expanded={expanded} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />}
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex h-[68px] items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:px-8">
             <button className="rounded-lg p-2 hover:bg-muted-bg md:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
@@ -474,7 +477,7 @@ export function AppLayout() {
             {inOrg && <GlobalSearch />}
             <div className="ml-auto flex items-center gap-1.5">
               {inOrg && <ScopeButton />}
-              <Notifications />
+              {!gated && <Notifications />}
               <ThemeToggle />
               <div className="mx-1.5 hidden h-7 w-px bg-line sm:block" />
               <ProfileMenu />
@@ -482,7 +485,7 @@ export function AppLayout() {
           </header>
           <main className="flex-1 px-4 py-7 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-[1600px]">
-              <Outlet />
+              {gated ? <MfaEnrolmentGate /> : <Outlet />}
             </div>
           </main>
         </div>

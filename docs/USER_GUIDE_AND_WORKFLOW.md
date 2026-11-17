@@ -563,7 +563,8 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | Checklist review | The reviewer list is based on approval permission; only the reviewer or the comment's author resolves a comment |
 | Screens | Pop-up forms keep their buttons on screen in short windows; role changes appear without reloading |
 | BRD / SRS check | Every requirement checked against the app ([REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md)). Added: search finds checklist questions; dashboard department filter and *Department comparison*; **Settings → Workflow & uploads → Regional settings → Time zone**, used on every screen and in final reports (default Asia/Kolkata) |
-| Quality | 69 backend, 11 frontend and 2 browser tests pass; the whole workflow was run in Chrome with five Meridian users |
+| Security | **Enforce MFA for privileged roles** now really enforces it: administrators, ISMS owners and auditors see only the set-up screen until they enrol, and cannot switch MFA off. Turn it on only after setting up MFA on your own account. Deletion requests are kept inside their organisation |
+| Quality | 78 backend, 11 frontend and 2 browser tests pass; load test with 50 simultaneous users: 95 % of requests within 104 ms; the whole workflow was run in Chrome with five Meridian users |
 
 ## Release notes – 16 November 2026
 

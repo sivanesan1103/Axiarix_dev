@@ -79,7 +79,7 @@ export function LoginPage() {
         setMfa(true);
         return;
       }
-      if (r.mfaEnrolmentRequired) toast.warning('Your role requires multi-factor authentication. Please enrol in Settings → Security.');
+      if (r.mfaEnrolmentRequired) toast.warning('Your role requires two-step verification. Set it up to continue.');
       navigate(from, { replace: true });
     } catch (e) {
       setError(errorMessage(e));

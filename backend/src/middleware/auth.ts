@@ -2,10 +2,11 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
-import { PLATFORM_PERMISSION, type PermissionKey, type RoleKey } from '../constants/permissions.js';
+import { PLATFORM_PERMISSION, PRIVILEGED_ROLES, type PermissionKey, type RoleKey } from '../constants/permissions.js';
 import type { AuthUser } from '../types/auth.js';
 import { AppError, forbidden, unauthorized } from '../utils/errors.js';
 import { recordAuditSafe } from '../services/audit.service.js';
+import { getSettingCached } from '../services/settings.service.js';
 
 interface AccessClaims {
   sub: string;
@@ -67,8 +68,22 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   if (claims.typ !== 'access') return next(unauthorized('Invalid token type'));
   const user = await loadAuthUser(claims.sub);
   if (!user) return next(unauthorized('Account is inactive'));
+  // Hard MFA enforcement (NFR-SEC-04): while the policy is on, a privileged account without MFA can
+  // only read its profile, enrol, change its password or sign out.
+  user.mfaEnrolmentRequired = await mfaEnrolmentRequired(user);
   req.user = user;
+  if (user.mfaEnrolmentRequired && !MFA_ENROLMENT_PATHS.includes(req.originalUrl.split('?')[0].replace(/^\/api\/v1/, ''))) {
+    return next(new AppError(403, 'MFA_ENROLMENT_REQUIRED', 'Your role requires two-step verification. Set it up to continue.'));
+  }
   next();
+}
+
+const MFA_ENROLMENT_PATHS = ['/auth/me', '/auth/mfa/setup', '/auth/mfa/enable', '/auth/logout', '/auth/change-password'];
+
+/** Privileged roles must use MFA when the organisation's security policy says so. */
+export async function mfaEnrolmentRequired(user: AuthUser): Promise<boolean> {
+  if (user.isPlatformOwner || user.mfaEnabled || !user.roles.some((r) => PRIVILEGED_ROLES.includes(r))) return false;
+  return (await getSettingCached('security.policy', user.organisationId)).enforceMfaForPrivileged;
 }
 
 export function hasPermission(user: AuthUser, key: PermissionKey) {

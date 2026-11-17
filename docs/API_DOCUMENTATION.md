@@ -4,6 +4,7 @@
 - Auth: `Authorization: Bearer <accessToken>` (15 min). Refresh uses the HTTP-only cookie `axr_rt` plus the header `X-Requested-With: axiarix`.
 - Lists accept `page` and `pageSize` (≤200) plus filters. Validation errors return **422** with Zod details; lifecycle conflicts return **409** (`INVALID_STATE`, `ASSESSMENT_LOCKED`, `IMMUTABLE`); scope or permission denials return **403** and are audited.
 - Permission keys are `resource:action` (see ROLE_PERMISSIONS.md).
+- While enforced MFA applies to a privileged user who has not enrolled, every endpoint except `/auth/me`, `/auth/mfa/setup`, `/auth/mfa/enable`, `/auth/change-password` and `/auth/logout` returns **403** `MFA_ENROLMENT_REQUIRED`; `/auth/me` then has `mfaEnrolmentRequired: true`.
 
 ## Health & auth
 
@@ -142,5 +143,5 @@
 | POST | `/admin/settings/test-email` · `/admin/reminders/run` | |
 | GET/POST | `/admin/scoring-policies` · POST `/:id/activate` | versioned, settings:approve |
 | GET/PUT | `/admin/retention-policies[/:entityType]` · POST `/admin/retention/run` | |
-| GET/POST | `/admin/deletion-requests` · POST `/:id/decision` · `/:id/execute` | two-person rule |
+| GET/POST | `/admin/deletion-requests` · POST `/:id/decision` · `/:id/execute` | two-person rule; only the caller's organisation |
 | GET/POST/PATCH | `/admin/schedules[/:id]` · POST `/:id/run` | periodic assessments |

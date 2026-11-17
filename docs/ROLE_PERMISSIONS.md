@@ -72,4 +72,4 @@ Blocked people see a *Separation of duties* note, and their Pending tasks leave 
 ## Assumptions
 
 - A user's permissions are the union of their roles, and their scope is the union of their role scopes. A user holding different roles in different branches therefore receives the combined permissions in all their branches. For the single-department pilot this is acceptable; a per-scope permission model can be introduced if multi-role users become common.
-- MFA is available to all users. When **Security policy → Enforce MFA for privileged roles** is on, administrators, ISMS owners and auditors are prompted to enrol at sign-in; hard blocking until enrolment is not implemented (see the final report).
+- MFA is available to all users. When **Security policy → Enforce MFA for privileged roles** is on, administrators, ISMS owners and auditors can use nothing but the MFA set-up (plus profile, password change and sign-out) until they enrol, and cannot switch MFA off. An administrator must have MFA before switching enforcement on.

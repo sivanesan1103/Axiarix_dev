@@ -89,9 +89,21 @@ export async function getSetting<K extends SettingKey>(key: K, organisationId?: 
   return (parsed.success ? parsed.data : settingDefaults[key]) as SettingValue<K>;
 }
 
+/** Short-lived cache for settings read on every request (e.g. the MFA policy). Cleared on save. */
+const settingCache = new Map<string, { at: number; value: unknown }>();
+export async function getSettingCached<K extends SettingKey>(key: K, organisationId: string, ttlMs = 30_000): Promise<SettingValue<K>> {
+  const k = orgKey(organisationId, key);
+  const hit = settingCache.get(k);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value as SettingValue<K>;
+  const value = await getSetting(key, organisationId);
+  settingCache.set(k, { at: Date.now(), value });
+  return value;
+}
+
 export async function setSetting<K extends SettingKey>(key: K, value: unknown, userId: string, organisationId: string) {
   const parsed = settingSchemas[key].parse(value) as Prisma.InputJsonValue;
   const k = orgKey(organisationId, key);
+  settingCache.delete(k);
   return prisma.systemSetting.upsert({
     where: { key: k },
     create: { key: k, value: parsed, updatedBy: userId },

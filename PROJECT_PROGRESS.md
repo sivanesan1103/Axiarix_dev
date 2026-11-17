@@ -120,4 +120,4 @@ Hosting, identity/SSO & MFA enforcement, exact quarterly calendar, checklist/SoA
   - Closed three gaps: checklist question search (FR-027), dashboard department filter and comparison (FR-021), configurable display time zone for screens and PDF (SRS 2.3, NFR-10). New `backend/tests/requirements.test.ts`.
   - Updated API, roles, database, architecture, testing, short user guide and final report docs.
   - Tests: backend 69/69, frontend 11/11, E2E 2/2.
-
+  - Later the same day: checked untested workflow branches (`flows.test.ts`, 9 tests). Fixed deletion requests leaking across organisations (migration `deletion_request_organisation`) and a production proxy setting that would have made all users share one rate limit (`TRUST_PROXY`, `API_RATE_LIMIT`). Added enforced MFA for privileged roles (with a guard so an administrator cannot lock themselves out) and a load test (`npm run test:load`: 50 users p95 104 ms). Tests: backend 78/78, frontend 11/11, E2E 2/2.

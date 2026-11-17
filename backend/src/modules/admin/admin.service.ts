@@ -28,7 +28,7 @@ export async function applyRetention(req: Request | null, organisationId: string
           await prisma.evidence.update({ where: { id: e.id }, data: { archivedAt: new Date() } });
           summary.archived++;
         } else if (!(await prisma.deletionRequest.findFirst({ where: { entityType: 'Evidence', entityId: e.id, status: { in: ['PENDING', 'APPROVED'] } } }))) {
-          await prisma.deletionRequest.create({ data: { entityType: 'Evidence', entityId: e.id, reason: `Retention policy: older than ${p.retentionDays} days`, requestedById: req?.user?.id ?? 'system' } });
+          await prisma.deletionRequest.create({ data: { organisationId, entityType: 'Evidence', entityId: e.id, reason: `Retention policy: older than ${p.retentionDays} days`, requestedById: req?.user?.id ?? 'system' } });
           summary.deletionRequests++;
         }
       }
@@ -39,7 +39,7 @@ export async function applyRetention(req: Request | null, organisationId: string
           await prisma.report.update({ where: { id: r.id }, data: { archivedAt: new Date() } });
           summary.archived++;
         } else if (!(await prisma.deletionRequest.findFirst({ where: { entityType: 'Report', entityId: r.id, status: { in: ['PENDING', 'APPROVED'] } } }))) {
-          await prisma.deletionRequest.create({ data: { entityType: 'Report', entityId: r.id, reason: `Retention policy: older than ${p.retentionDays} days`, requestedById: req?.user?.id ?? 'system' } });
+          await prisma.deletionRequest.create({ data: { organisationId, entityType: 'Report', entityId: r.id, reason: `Retention policy: older than ${p.retentionDays} days`, requestedById: req?.user?.id ?? 'system' } });
           summary.deletionRequests++;
         }
       }
@@ -54,14 +54,14 @@ export async function requestDeletion(req: Request, entityType: 'Evidence' | 'Re
   const org = req.user!.organisationId;
   const exists = entityType === 'Evidence' ? await prisma.evidence.findFirst({ where: { id: entityId, organisationId: org } }) : await prisma.report.findFirst({ where: { id: entityId, organisationId: org } });
   if (!exists) throw notFound(entityType);
-  const dr = await prisma.deletionRequest.create({ data: { entityType, entityId, reason, requestedById: req.user!.id } });
+  const dr = await prisma.deletionRequest.create({ data: { organisationId: org, entityType, entityId, reason, requestedById: req.user!.id } });
   await recordAudit({ req, action: 'DELETION_REQUESTED', entityType, entityId, metadata: { requestId: dr.id, reason } });
   return dr;
 }
 
 /** Second-person decision. The requester can never approve their own request. */
 export async function decideDeletion(req: Request, id: string, decision: 'APPROVED' | 'REJECTED') {
-  const dr = await prisma.deletionRequest.findUnique({ where: { id } });
+  const dr = await prisma.deletionRequest.findFirst({ where: { id, organisationId: req.user!.organisationId } });
   if (!dr) throw notFound('Deletion request');
   if (dr.status !== 'PENDING') throw invalidState('Request already decided');
   if (dr.requestedById === req.user!.id) throw forbidden('A different authorised person must approve a deletion you requested');
@@ -75,7 +75,7 @@ export async function decideDeletion(req: Request, id: string, decision: 'APPROV
  * (who/what/when/checksum) is retained so the audit trail stays complete.
  */
 export async function executeDeletion(req: Request, id: string) {
-  const dr = await prisma.deletionRequest.findUnique({ where: { id } });
+  const dr = await prisma.deletionRequest.findFirst({ where: { id, organisationId: req.user!.organisationId } });
   if (!dr) throw notFound('Deletion request');
   if (dr.status !== 'APPROVED') throw invalidState('Only approved requests can be executed');
   if (dr.entityType === 'Evidence') {

@@ -27,6 +27,8 @@ export interface SessionUser {
   isPlatformOwner: boolean;
   /** Permissions an administrator removed from this user (their role still includes them). */
   restrictions: { permission: string; reason: string; expiresAt: string | null }[];
+  /** The security policy requires MFA for this account and it is not set up yet. */
+  mfaEnrolmentRequired?: boolean;
   /** Organisation display time zone (IANA), e.g. Asia/Kolkata. */
   timeZone?: string;
 }

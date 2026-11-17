@@ -10,7 +10,7 @@ import { getSetting } from '../../services/settings.service.js';
 import { notifyPasswordReset } from './auth.mail.js';
 import { loadAuthUser } from '../../middleware/auth.js';
 import type { AuthUser } from '../../types/auth.js';
-import { AppError, badRequest, unauthorized } from '../../utils/errors.js';
+import { AppError, badRequest, forbidden, unauthorized } from '../../utils/errors.js';
 import {
   decryptSecret,
   encryptSecret,
@@ -62,6 +62,7 @@ export function publicUser(u: AuthUser) {
     mfaEnabled: u.mfaEnabled,
     isPlatformOwner: u.isPlatformOwner,
     restrictions: u.restrictions,
+    mfaEnrolmentRequired: !!u.mfaEnrolmentRequired,
   };
 }
 
@@ -127,12 +128,13 @@ export async function login(req: Request, email: string, password: string, mfaCo
   const { token } = await issueRefreshToken(user.id, req);
   await recordAudit({ req, action: 'LOGIN', entityType: 'User', entityId: user.id, actorId: user.id, actorEmail: user.email, organisationId: user.organisationId });
   const privileged = authUser.roles.some((r) => PRIVILEGED_ROLES.includes(r as RoleKey));
+  authUser.mfaEnrolmentRequired = security.enforceMfaForPrivileged && privileged && !user.mfaEnabled && !authUser.isPlatformOwner;
   return {
     mfaRequired: false,
     accessToken: signAccessToken(user.id),
     refreshToken: token,
     user: publicUser(authUser),
-    mfaEnrolmentRequired: security.enforceMfaForPrivileged && privileged && !user.mfaEnabled,
+    mfaEnrolmentRequired: authUser.mfaEnrolmentRequired,
   };
 }
 
@@ -233,6 +235,8 @@ export async function mfaEnable(req: Request, code: string) {
 export async function mfaDisable(req: Request, password: string, code: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
   if (!user.mfaEnabled || !user.mfaSecret) throw badRequest('MFA is not enabled');
+  const security = await getSetting('security.policy', user.organisationId);
+  if (security.enforceMfaForPrivileged && req.user!.roles.some((r) => PRIVILEGED_ROLES.includes(r))) throw forbidden('Your role requires two-step verification, so it cannot be switched off');
   if (!(await bcrypt.compare(password, user.passwordHash))) throw badRequest('Password is incorrect');
   if (!verifyTotp(decryptSecret(user.mfaSecret), code)) throw badRequest('Invalid verification code');
   await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecret: null } });

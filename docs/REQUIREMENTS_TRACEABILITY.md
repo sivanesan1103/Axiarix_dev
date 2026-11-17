@@ -4,11 +4,13 @@ Checked on 17 November 2026 against `Axiarix_ISO27001_2022_BRD_Hospital_IT_Pilot
 
 **How each item was checked**
 
-- **Test:** an automated test in `backend/tests/*.test.ts` (69 tests), `frontend/tests/unit` (11) or the Playwright browser test `frontend/tests/e2e/workflow.spec.ts` (2). All pass.
+- **Test:** an automated test in `backend/tests/*.test.ts` (78 tests), `frontend/tests/unit` (11) or the Playwright browser test `frontend/tests/e2e/workflow.spec.ts` (2). All pass.
 - **Live:** done by hand in the running app in Chrome with the Meridian Diagnostics users, or by calling the running API.
 - **Deployment:** met by how the system is hosted; `docs/DEPLOYMENT.md` gives the steps. It can't be shown on a developer laptop.
 
 **Status:** ✅ met · 🟡 met with a limitation noted · ⚙️ deployment responsibility · ⏳ open stakeholder decision (SRS §13).
+
+**Added after the check (17 Nov, later):** enforced MFA for privileged roles (NFR-SEC-04); a load test (`npm run test:load`, NFR-01); tests for every workflow branch outside the main path (approval rejection, finalise without approval, returned closure evidence, checklist return to draft, unassigning, retention with two-person deletion, schedules). Two defects found and fixed while doing this: deletion requests were not kept inside their organisation, and the production proxy setting would have made the whole hospital share one rate limit behind a load balancer.
 
 **Fixed during this check:** search did not cover checklist questions (FR-027). The dashboard had no department filter or per-department view (FR-021, BRD §9). Dates had no configurable time zone, and PDF reports printed UTC (SRS 2.3, NFR-10). All three are now implemented and tested.
 
@@ -99,7 +101,7 @@ The photographed note in the project folder lists 8 points; each maps to the BRD
 | FR-025 | BR-10 | Log logins, permission changes, evidence changes, submissions, approvals | Audit events for each | `auth.test`; `workflow.test` | ✅ |
 | FR-026 | — | Only authorised users reopen, with reason and log | **Reopen** (`assessment:reopen`) | `workflow.test › AT-11` | ✅ |
 | FR-027 | — | Search checklist items, assessments, findings, reports | Top-bar search; **checklist questions added** | `requirements.test › FR-027`; live ("awareness induction" → IA-003) | ✅ |
-| FR-028 | — | Configurable retention and archival | Settings → Retention; archive or deletion request (second person approves) | Code: `applyRetention`, `decideDeletion` | ✅ |
+| FR-028 | — | Configurable retention and archival | Settings → Retention; archive or deletion request (second person approves); requests stay inside their organisation | `flows.test › retention raises deletion requests…` | ✅ |
 
 ## 5. Workflow and states (SRS §4)
 
@@ -132,7 +134,7 @@ Every entity and key attribute listed in SRS §5 exists in `backend/prisma/schem
 | NFR-SEC-01 | HTTPS with current TLS | TLS at the load balancer; HSTS in production mode | ⚙️ |
 | NFR-SEC-02 | No plaintext passwords or secrets | bcrypt password hashing; MFA secrets AES-GCM encrypted; refresh tokens stored as hashes | ✅ |
 | NFR-SEC-03 | Server-side least-privilege checks on every operation and file | `requirePermission`, scope checks, signed file links | ✅ |
-| NFR-SEC-04 | MFA for privileged and auditor accounts | TOTP for every user; Settings → *Enforce MFA for privileged roles* prompts enrolment at sign-in. Limitation: it prompts, it does not block until enrolled | 🟡 |
+| NFR-SEC-04 | MFA for privileged and auditor accounts | TOTP for every user. With Settings → *Enforce MFA for privileged roles* on, administrators, ISMS owners and auditors can do nothing but set up MFA until they enrol, and cannot switch it off; an administrator must enrol before switching enforcement on | ✅ |
 | NFR-SEC-05 | Encryption at rest for evidence and database | Encrypted database storage and bucket SSE in the hosting | ⚙️ |
 | NFR-SEC-06 | Tamper-resistant logs | Database trigger blocks UPDATE/DELETE on audit events; SHA-256 hash chain with a verify endpoint | ✅ |
 | NFR-SEC-07 | Validate and scan uploads | Signature, double-extension and allow-list checks; ClamAV (EICAR test refused) | ✅ |
@@ -146,7 +148,7 @@ Every entity and key attribute listed in SRS §5 exists in `backend/prisma/schem
 
 | SRS | Requirement | Evidence | Status |
 | --- | --- | --- | --- |
-| NFR-01 | 95 % of page requests under 3 s | 12,133 API reads on the local server: median 12 ms, 95th percentile 49 ms, slowest 753 ms, 100 % under 3 s. Needs repeating under agreed load in UAT | 🟡 |
+| NFR-01 | 95 % of page requests under 3 s | `npm run test:load` on the local server: 50 simultaneous users, 23,849 requests in 30 s, 0 errors, p95 104 ms, slowest 328 ms; 200 users: p95 424 ms, slowest 877 ms. 100 % under 3 s. Repeat on the UAT servers | ✅ |
 | NFR-02 | Availability target | Hosting decision | ⏳ |
 | NFR-03 | Add departments, sites, users, periods without redesign | Multi-organisation, multi-branch model; several organisations run side by side | ✅ |
 | NFR-04 | A trained user can answer an item and attach evidence | Walkthrough and user guide; Meridian users did it in the live run | ✅ |
@@ -207,7 +209,7 @@ Every entity and key attribute listed in SRS §5 exists in `backend/prisma/schem
 | Decision | Current setting in the app |
 | --- | --- |
 | Hosting | Reference deployment in `docs/DEPLOYMENT.md`; local Docker for the pilot |
-| Identity | Local accounts; TOTP MFA available; SSO not built |
+| Identity | Local accounts; TOTP MFA available, enforceable for privileged roles; SSO not built |
 | Assessment cycle | Quarterly by default (Indian financial year); reminders 3 days before due dates |
 | Checklist source | Excel import; named reviewer approves before publishing |
 | Evidence storage | Private S3-compatible bucket; 25 MB; PDF, DOCX, XLSX, CSV, PNG, JPG; retention configurable |
@@ -220,8 +222,8 @@ Every entity and key attribute listed in SRS §5 exists in `backend/prisma/schem
 
 ## Items to raise with the hospital
 
-1. **MFA enforcement (NFR-SEC-04):** today privileged users are prompted to enrol; if the decision is "MFA mandatory", the next step is to block privileged accounts until they enrol.
+1. **MFA (NFR-SEC-04):** enforcement is built and off by default; decide whether to switch it on (Settings → Workflow & uploads → Security policy).
 2. **Firefox (NFR-05):** run the browser test suite in Firefox during UAT.
-3. **Performance (NFR-01):** repeat the timing check under the agreed UAT load.
+3. **Performance (NFR-01):** run `npm run test:load` against the UAT servers with the agreed number of users.
 4. **Deployment items (NFR-SEC-01, 05, 09, 10, NFR-02, 07):** confirm hosting, encryption, backup and service-level choices.
 5. **SSO:** optional in the SRS; decide whether the pilot needs it.

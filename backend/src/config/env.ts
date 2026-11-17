@@ -16,6 +16,10 @@ const envSchema = z.object({
   MFA_ENCRYPTION_KEY: z.string().length(32),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(30),
+  /** API requests per minute per client address (protects against floods; raise for large sites). */
+  API_RATE_LIMIT: z.coerce.number().int().positive().default(600),
+  /** Number of reverse proxies in front of the API (load balancer + nginx = 2), so the real client address is used. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).optional(),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   STORAGE_DRIVER: z.enum(['s3', 'local']).default('s3'),
   S3_ENDPOINT: z.string().optional(),

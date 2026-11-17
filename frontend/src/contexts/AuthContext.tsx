@@ -71,9 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     const t = setInterval(refresh, 60_000);
     window.addEventListener('focus', refresh);
+    // The API client raises this when the server starts requiring MFA mid-session.
+    window.addEventListener('axiarix:mfa-required', refresh);
     return () => {
       clearInterval(t);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('axiarix:mfa-required', refresh);
     };
   }, [status]);
 
@@ -81,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const r = await authService.login(email, password, mfaCode);
     if (r.mfaRequired || !r.user) return { mfaRequired: true };
     setDisplayTimeZone(r.user.timeZone);
-    setUser(r.user);
+    setUser({ ...r.user, mfaEnrolmentRequired: r.mfaEnrolmentRequired ?? r.user.mfaEnrolmentRequired });
     setStatus('authenticated');
     return { mfaRequired: false, mfaEnrolmentRequired: r.mfaEnrolmentRequired };
   }, []);

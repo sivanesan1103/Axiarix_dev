@@ -11,7 +11,7 @@ export function createApp() {
   const app = express();
   app.disable('x-powered-by');
   // Behind a TLS-terminating reverse proxy in production, so req.ip / secure cookies work.
-  app.set('trust proxy', isProduction ? 1 : false);
+  app.set('trust proxy', env.TRUST_PROXY ?? (isProduction ? 1 : false));
 
   app.use(requestId);
   app.use(
@@ -35,7 +35,7 @@ export function createApp() {
     '/api',
     rateLimit({
       windowMs: 60_000,
-      limit: isTest ? 100_000 : 600,
+      limit: isTest ? 100_000 : env.API_RATE_LIMIT,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
       message: { error: { code: 'RATE_LIMITED', message: 'Too many requests. Please slow down.' } },

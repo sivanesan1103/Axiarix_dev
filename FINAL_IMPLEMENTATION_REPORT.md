@@ -13,8 +13,11 @@ Since this report was first written (13 November), the following has been added 
 - **Task flow:** work can only be given to people in the record's branch and department; **Change owner** for open assessments; Pending tasks cover every kind of work; finding owners of any role plan corrective actions.
 - **Audit review:** every answer and evidence file needs a decision before the review can be submitted; accepting a file does not accept the answer.
 - **Requirement gaps closed on 17 Nov:** search covers checklist questions (FR-027); dashboard department filter and per-department comparison (FR-021, BRD §9); configurable display time zone used on screens and in PDF reports (SRS 2.3, NFR-10).
-- **Tests now:** backend 69 passed (5 files), frontend unit 11, Playwright 2 (run twice); lint and type checks clean. Whole workflow run by hand in Chrome with five users of a second organisation (Meridian Diagnostics).
-- **NFR-01 measurement:** 12,133 API reads on the local server — median 12 ms, 95th percentile 49 ms, slowest 753 ms.
+- **Tests now:** backend 78 passed (6 files), frontend unit 11, Playwright 2 (run twice); lint and type checks clean. Whole workflow run by hand in Chrome with five users of a second organisation (Meridian Diagnostics).
+- **NFR-01 load test** (`npm run test:load`): 50 simultaneous users — 23,849 requests in 30 s, 0 errors, p95 104 ms, slowest 328 ms; 200 users — p95 424 ms.
+- **Enforced MFA** for privileged roles (NFR-SEC-04), off by default.
+- **Workflow branches tested** (`flows.test.ts`): approval rejection, finalise without approval, returned closure evidence, checklist return to draft, unassigning, retention with two-person deletion, schedules.
+- **Defects fixed:** deletion requests are now kept inside their organisation; `TRUST_PROXY` and `API_RATE_LIMIT` are configurable so users behind a load balancer do not share one rate limit.
 
 ---
 
@@ -123,7 +126,7 @@ Since this report was first written (13 November), the following has been added 
 | NFR-SEC-01 HTTPS | HSTS in production, `COOKIE_SECURE`, TLS at ingress (DEPLOYMENT.md) | Production header check (HSTS present) | Configured; TLS is deployment-time |
 | NFR-SEC-02 No plaintext secrets | bcrypt passwords; hashed refresh/reset tokens; AES-GCM MFA secrets; env secrets | Unit (AES), auth tests | Pass |
 | NFR-SEC-03 Least privilege, server-side authorisation | RBAC matrix, scope checks on every record and file | RBAC tests, AT-10 | Pass |
-| NFR-SEC-04 MFA for privileged users | TOTP; enforcement prompt | Unit TOTP vector | Partial (no hard block) |
+| NFR-SEC-04 MFA for privileged users | TOTP; enforced set-up for privileged roles when the policy is on (since 17 Nov) | Unit TOTP vector; `flows.test › enforced MFA` | Pass |
 | NFR-SEC-05 Encryption at rest | S3 SSE (AES256 on AWS); DB/bucket encryption is infrastructure | — | Deployment-time |
 | NFR-SEC-06 Tamper-resistant logs | Append-only trigger + hash chain + export | Audit tests | Pass |
 | NFR-SEC-07 Upload validation and scanning | Allow-list, signature, size, executables, scan before storage | Unit + malware tests | Pass (built-in scanner) |
@@ -132,7 +135,7 @@ Since this report was first written (13 November), the following has been added 
 | NFR-SEC-10 Admin access recorded | All admin actions audited | Audit tests | Pass (DB access is infra) |
 | NFR-SEC-11 Retention and secure deletion | Policies + two-person deletion | Not automated | Implemented, untested |
 | NFR-SEC-12 No PHI as evidence | Upload dialog warning; classification field | — | Guidance only |
-| NFR-01 Performance | Indexed queries; code-split SPA | 17 Nov: 12,133 local API reads, p95 49 ms, max 753 ms | Measured locally; not load-tested |
+| NFR-01 Performance | Indexed queries; code-split SPA | 17 Nov load test: 50 users p95 104 ms, 200 users p95 424 ms, 0 errors | Pass locally; repeat on UAT servers |
 | NFR-03 Scalability | Multi-site/department data model | AT-01, AT-12 | Pass |
 | NFR-04 Usability | Guided workspace, inline validation, jump-to-missing on submit | E2E | Pass |
 | NFR-05 Compatibility | Chromium verified | E2E (Chromium only) | Partial |
@@ -176,12 +179,11 @@ Since this report was first written (13 November), the following has been added 
 ## G. Outstanding work
 
 **Missing or partial functionality**
-- MFA enforcement for privileged roles is a prompt at sign-in, not a hard block until enrolment.
-- Retention runs, secure deletion and assessment schedules are implemented but have no automated tests (global search is now tested).
+- Retention runs, secure deletion, assessment schedules and global search now have automated tests.
 - The ClamAV adapter has not been exercised against a running clamd; only the built-in heuristic scanner is verified. The built-in scanner is not a substitute for an AV engine in production.
 - Permissions are the union across a user's roles (not per scope); see ROLE_PERMISSIONS.md.
 - SSO (SAML/OIDC) is not implemented; out of scope until the hospital confirms its identity provider.
-- No load/performance test (NFR-01) and E2E covers Chromium only (NFR-05: Edge/Firefox untested).
+- Load test run locally only (repeat on UAT servers); E2E covers Chromium only (NFR-05: Edge/Firefox untested).
 - Frontend unit tests cover shared components and helpers; page-level behaviour is covered by E2E rather than unit tests.
 
 **Known issues / data notes**

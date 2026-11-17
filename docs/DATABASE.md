@@ -39,7 +39,7 @@ npx prisma validate            # schema check
 npx prisma migrate dev         # create a new migration (development)
 ```
 
-Migrations: `init` · `integrity_triggers` · `iso_reference_id` · `multi_org_restrictions_review` (per-organisation roles, platform owner, per-user restrictions, named checklist reviewer and review comments).
+Migrations: `init` · `integrity_triggers` · `iso_reference_id` · `multi_org_restrictions_review` (per-organisation roles, platform owner, per-user restrictions, named checklist reviewer and review comments) · `deletion_request_organisation` (deletion requests belong to an organisation).
 
 ## Seeding
 

@@ -9,7 +9,7 @@ Sign in at the Axiarix address with your hospital account. The left icon rail sh
 - **Dashboard** – compliance score, questions, evidence coverage, completion, open findings, overdue actions, pending approvals; charts by ISO clause / Annex A theme, status distribution, findings by severity, corrective-action progress, quarterly trend, branch or department comparison, recent activity and your **Pending tasks** (everything given to you). A department filter sits next to the welcome line.
 - **Search** (top bar) – assessments, findings, checklists, checklist questions, reports and evidence you can access.
 - **Light / dark mode** – the sun/moon button in the top bar switches theme; **Settings → Profile & security → Appearance** offers Light, Dark or System (follow your computer). The choice is remembered in this browser.
-- **Settings → Profile & security** – change your password; set up two-step verification (MFA) with an authenticator app.
+- **Settings → Profile & security** – change your password; set up two-step verification (MFA) with an authenticator app. If your organisation enforces MFA for your role (administrators, ISMS owners, auditors), the app shows only the set-up screen until you have done it.
 - **Notifications** (bell) – assignments, clarifications, rejections, findings, approvals and deadlines. The same messages are e-mailed when e-mail is enabled.
 
 ## Platform owner

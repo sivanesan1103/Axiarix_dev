@@ -999,18 +999,21 @@ model RetentionPolicy {
 
 /// Secure deletion is a two-person workflow: request → approve → execute.
 model DeletionRequest {
-  id            String         @id @default(uuid())
-  entityType    String
-  entityId      String
-  reason        String
-  status        DeletionStatus @default(PENDING)
-  requestedById String
-  decidedById   String?
-  decidedAt     DateTime?
-  executedAt    DateTime?
-  createdAt     DateTime       @default(now())
+  id             String         @id @default(uuid())
+  /// Owning organisation; requests are only listed, decided and executed inside it.
+  organisationId String?
+  entityType     String
+  entityId       String
+  reason         String
+  status         DeletionStatus @default(PENDING)
+  requestedById  String
+  decidedById    String?
+  decidedAt      DateTime?
+  executedAt     DateTime?
+  createdAt      DateTime       @default(now())
 
   @@index([status])
+  @@index([organisationId, status])
 }
 
 model AssessmentSchedule {
