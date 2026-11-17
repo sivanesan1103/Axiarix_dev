@@ -64,9 +64,9 @@
 | PUT | `/checklists/items/:itemId/mappings` | replaces mappings and confirms review |
 | POST | `/checklists/items/:itemId/mappings/confirm` | the named reviewer confirms a flagged mapping as correct `{ note? }` |
 | POST | `/checklists/versions/:versionId/reorder` | `{ itemIds }` |
-| POST | `/checklists/versions/:versionId/submit-review` | `{ reviewerId }` – the named reviewer must have checklist:approve and must not be the author |
+| POST | `/checklists/versions/:versionId/submit-review` | `{ reviewerId }` – the named reviewer must have checklist:approve and must not be the version's author; the submitter may name themselves if they are not the author |
 | POST | `/checklists/versions/:versionId/return-to-draft` · `publish` · `archive` | only the named reviewer publishes, after every flagged mapping is confirmed and every review comment resolved |
-| GET | `/checklists/versions/:versionId/eligible-reviewers` | people with checklist:approve, excluding the author, the caller and restricted users |
+| GET | `/checklists/versions/:versionId/eligible-reviewers` | people with checklist:approve, excluding the version's author and restricted users (the caller is included when not the author) |
 | GET/POST | `/checklists/versions/:versionId/review-comments` | review comments (per question or general); each row has `canResolve` |
 | POST | `/checklists/review-comments/:id/resolve` | only the comment's author or the named reviewer |
 | GET/POST | `/imports` | upload `.xlsx` (multipart `file`) → PREVIEW |

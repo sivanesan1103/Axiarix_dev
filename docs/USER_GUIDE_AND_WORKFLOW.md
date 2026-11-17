@@ -316,12 +316,12 @@ Or click **New checklist** to start empty and add questions by hand.
 ### Submit for review
 
 1. Click **Submit for review**.
-2. Choose a **Reviewer**. The list shows ISMS owners and administrators, minus you and the author. The server also checks the reviewer can approve checklists.
+2. Choose a **Reviewer**. Only two people are needed: the author and one reviewer. The list shows everyone who can approve checklists (ISMS owners and administrators) except the version's author. If you are not the author — say an administrator wrote it and you are the ISMS owner — you can name yourself and then review and publish it. A new version works the same way: whoever created it is its author.
 3. Click **Submit**. Editing locks and the reviewer gets a notification.
 
 ![Submit for review: choosing the named reviewer](screenshots/guide/14-submit-to-reviewer.png)
 
-As the author you now see: *You wrote or submitted this version, so the named reviewer must publish or return it.* There is no Publish button for you.
+As the author you now see: *You wrote this version, so the named reviewer must publish or return it.* There is no Publish button for you.
 
 ![The author's view after submitting: no Publish button, separation-of-duties note](screenshots/guide/15-author-blocked.png)
 
@@ -560,7 +560,7 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | Audit review | Every answer and evidence file needs a decision. Accepting a file no longer accepts the answer. A *Reviewed X of Y* counter shows progress, **Accept answer** becomes *Answer accepted* once done, and the history says whether the answer or the evidence was accepted |
 | Restrictions | People restricted from uploading, raising findings or changing answers no longer see those buttons; a note says who can do it |
 | Corrective actions | Whoever owns a finding, including an IT Control Owner, can plan its corrective action |
-| Checklist review | The reviewer list is based on approval permission; only the reviewer or the comment's author resolves a comment |
+| Checklist review | One reviewer is enough: anyone with approval permission except the version's author, including the person submitting. The reviewer list is based on approval permission; only the reviewer or the comment's author resolves a comment |
 | Screens | Pop-up forms keep their buttons on screen in short windows; role changes appear without reloading |
 | BRD / SRS check | Every requirement checked against the app ([REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md)). Added: search finds checklist questions; dashboard department filter and *Department comparison*; **Settings → Workflow & uploads → Regional settings → Time zone**, used on every screen and in final reports (default Asia/Kolkata) |
 | Security | **Enforce MFA for privileged roles** now really enforces it: administrators, ISMS owners and auditors see only the set-up screen until they enrol, and cannot switch MFA off. Turn it on only after setting up MFA on your own account. Deletion requests are kept inside their organisation |

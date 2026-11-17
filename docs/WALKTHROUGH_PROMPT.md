@@ -95,7 +95,7 @@ Records you will create get the next numbers. Expected: **ASM-2026-0004**, **FND
 15. **Add question**: question `Backup restoration is tested every quarter`, description `Restore test record with sign-off`. Under *ISO / control mapping* pick *Annex A control* → `8.13 – Information backup` → **Add** → **Add question**.
     Expect: question Q-001 listed with chip *A.8.13*.
 16. Click **Submit for review**. In *Reviewer* choose **Arjun Mehta — System Administrator**. **Submit**.
-    Expect: status *Under review*; panel shows Author *Lakshmi Iyer*, Named reviewer *Arjun Mehta*; blue note *You wrote or submitted this version, so the named reviewer must publish or return it*; no **Publish** button for you.
+    Expect: status *Under review*; panel shows Author *Lakshmi Iyer*, Named reviewer *Arjun Mehta*; blue note *You wrote this version, so the named reviewer must publish or return it*; no **Publish** button for you.
 17. Sign in as **admin@axiarix.local**. Open the bell → *Checklist review requested: Walkthrough Backup Controls* (or Checklist Library → the checklist → version 1).
     Expect: **Return with comments** and **Publish** are visible and enabled.
 18. Click **Add review comment**: `Looks good`. Then **Resolve** it. Click **Publish** → confirm.

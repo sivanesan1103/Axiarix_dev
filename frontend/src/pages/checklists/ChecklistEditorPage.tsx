@@ -260,6 +260,7 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
  * and you. When nobody qualifies, the message says how to fix it instead of showing an empty list.
  */
 function ReviewerSelect({ versionId, value, onChange }: { versionId: string; value: string; onChange: (v: string) => void }) {
+  const { user } = useAuth();
   const q = useQuery({ queryKey: ['eligible-reviewers', versionId], queryFn: () => checklistsService.eligibleReviewers(versionId) });
   const people = q.data ?? [];
   return (
@@ -268,13 +269,14 @@ function ReviewerSelect({ versionId, value, onChange }: { versionId: string; val
         <option value="">{q.isLoading ? 'Loading…' : people.length ? 'Choose a reviewer' : 'No eligible reviewer'}</option>
         {people.map((u) => (
           <option key={u.id} value={u.id}>
-            {u.name} — {u.roles.join(', ')}
+            {u.name}
+            {u.id === user?.id ? ' (you)' : ''} — {u.roles.join(', ')}
           </option>
         ))}
       </NativeSelect>
       {!q.isLoading && !people.length && (
         <p className="mt-2 rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
-          Nobody else in this organisation can approve checklists. An administrator can give someone the ISMS / Compliance Owner role (Users → Edit details &amp; roles), or add the checklist Approve permission to a role.
+          Nobody other than the author can approve checklists in this organisation. An administrator can give someone the ISMS / Compliance Owner role (Users → Edit details &amp; roles), or add the checklist Approve permission to a role.
         </p>
       )}
     </>
@@ -581,7 +583,7 @@ export function ChecklistEditorPage() {
         open={confirm === 'submit-review'}
         onOpenChange={() => setConfirm(null)}
         title="Submit for review"
-        description="Editing is locked while the reviewer checks this version. The reviewer must be someone other than you or the author, with checklist approval rights."
+        description="Editing is locked while the reviewer checks this version. One reviewer is needed: anyone with checklist approval rights (an administrator or ISMS owner) except the author of this version. If you did not write it, you can name yourself."
         confirmLabel="Submit"
         onConfirm={async () => {
           if (!reviewerId) throw new Error('Choose a reviewer.');

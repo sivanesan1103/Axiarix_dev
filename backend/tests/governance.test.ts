@@ -189,6 +189,26 @@ describe.sequential('separation of duties', () => {
     expect((await admin.post(`/api/v1/checklists/versions/${versionId}/publish`)).status).toBe(200);
   });
 
+  it('checklists need two people only: the author and one reviewer; new versions follow the same rule', async () => {
+    // The administrator writes a checklist; the ISMS owner (not the author) submits it to themselves and publishes.
+    const t = await admin.post('/api/v1/checklists', { title: 'Two-person review' });
+    const v1 = (await admin.get(`/api/v1/checklists/${t.body.data.id}`)).body.data.versions[0].id as string;
+    await admin.post(`/api/v1/checklists/versions/${v1}/items`, { question: 'Media is wiped before disposal', mappings: [{ type: 'ANNEX_A', reference: '7.14' }] });
+    const names = (await isms.get(`/api/v1/checklists/versions/${v1}/eligible-reviewers`)).body.data.map((u: { name: string }) => u.name);
+    expect(names).toContain('Lakshmi Iyer'); // the caller, not the author
+    expect(names).not.toContain('Arjun Mehta'); // the author
+    expect((await isms.post(`/api/v1/checklists/versions/${v1}/submit-review`, { reviewerId: base.users['isms@axiarix.local'] })).status).toBe(200);
+    expect((await admin.post(`/api/v1/checklists/versions/${v1}/publish`)).body.error.code).toBe('SEGREGATION_OF_DUTIES'); // the author cannot publish
+    expect((await isms.post(`/api/v1/checklists/versions/${v1}/publish`)).status).toBe(200);
+
+    // The ISMS owner creates version 2: now they are its author, so the administrator reviews it.
+    const v2 = await isms.post(`/api/v1/checklists/${t.body.data.id}/versions`, { changeSummary: 'Add disposal certificate' });
+    expect(v2.status).toBe(201);
+    expect((await isms.post(`/api/v1/checklists/versions/${v2.body.data.id}/submit-review`, { reviewerId: base.users['isms@axiarix.local'] })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await isms.post(`/api/v1/checklists/versions/${v2.body.data.id}/submit-review`, { reviewerId: base.users['admin@axiarix.local'] })).status).toBe(200);
+    expect((await admin.post(`/api/v1/checklists/versions/${v2.body.data.id}/publish`)).status).toBe(200);
+  });
+
   it('checklist status filter matches the latest version only', async () => {
     const t = (await prisma.checklistVersion.findUniqueOrThrow({ where: { id: state.versionId } })).templateId;
     const v2 = await isms.post(`/api/v1/checklists/${t}/versions`, { changeSummary: 'Second revision' });

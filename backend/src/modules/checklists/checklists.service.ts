@@ -191,8 +191,11 @@ const TRANSITIONS: Record<string, { from: ChecklistVersionStatus[]; to: Checklis
 /**
  * Moves a checklist version through Draft → Under Review → Published → Archived.
  *
- * Four-eyes rule (ISO/IEC 27001 A.5.3): submitting names a reviewer who holds checklist:approve and
- * is neither the version's author nor the submitter. Only that reviewer may publish or return it.
+ * Four-eyes rule (ISO/IEC 27001 A.5.3): two people — the version's author and one reviewer. Submitting
+ * names a reviewer who holds checklist:approve and did not create this version (an administrator's
+ * checklist can be reviewed by an ISMS owner and vice versa; the person submitting may name themselves
+ * when they are not the author). Only that reviewer may publish or return it. A new version follows the
+ * same rule, its author being whoever created that version.
  * Publishing also requires every import-flagged ISO mapping to be resolved (confirmed or corrected);
  * blanket acknowledgement is no longer accepted.
  */
@@ -214,8 +217,8 @@ export async function transitionVersion(
       const items = await tx.checklistItem.count({ where: { versionId, status: 'ACTIVE' } });
       if (!items) throw validationError('A checklist version needs at least one active question');
       if (!opts.reviewerId) throw validationError('Choose a reviewer for this version', { fieldErrors: { reviewerId: ['Required'] } });
-      if (opts.reviewerId === user.id || opts.reviewerId === version.createdById) {
-        throw sodError('The reviewer must be someone other than the author or the person submitting.');
+      if (opts.reviewerId === version.createdById) {
+        throw sodError('The reviewer must be someone other than the author of this version.');
       }
       const reviewer = await loadAuthUser(opts.reviewerId);
       if (!reviewer || reviewer.organisationId !== user.organisationId || !reviewer.permissions.has('checklist:approve')) {
@@ -225,8 +228,8 @@ export async function transitionVersion(
     }
 
     if (op === 'publish' || op === 'return') {
-      if (version.createdById === user.id || version.submittedById === user.id) {
-        throw sodError('You wrote or submitted this version, so the named reviewer must publish or return it.');
+      if (version.createdById === user.id) {
+        throw sodError('You wrote this version, so the named reviewer must publish or return it.');
       }
       if (version.reviewerId && version.reviewerId !== user.id) {
         throw sodError('Only the named reviewer can publish or return this version.');
@@ -310,7 +313,8 @@ export async function eligibleReviewers(req: Request, versionId: string) {
       organisationId: req.user!.organisationId,
       status: 'ACTIVE',
       isPlatformOwner: false,
-      id: { notIn: [req.user!.id, version.createdById].filter((x): x is string => !!x) },
+      // Everyone who can approve checklists except the version's author (the caller may review if they are not the author).
+      id: { notIn: [version.createdById].filter((x): x is string => !!x) },
       roles: { some: { role: { permissions: { some: { permission: { key: 'checklist:approve' } } } } } },
       NOT: { restrictions: { some: { permission: { key: 'checklist:approve' }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } },
     },

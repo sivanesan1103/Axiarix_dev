@@ -159,7 +159,7 @@ checklistsRouter.get('/versions/:versionId', requirePermission('checklist:read')
   ]);
   const person = (id: string | null) => (id ? (people.find((p) => p.id === id) ?? null) : null);
   const u = req.user!;
-  const isAuthor = version.createdById === u.id || version.submittedById === u.id;
+  const isAuthor = version.createdById === u.id;
   const isReviewer = version.reviewerId === u.id;
   const review = {
     author: person(version.createdById),
@@ -173,7 +173,7 @@ checklistsRouter.get('/versions/:versionId', requirePermission('checklist:read')
     blocked:
       version.status === 'UNDER_REVIEW' && u.permissions.has('checklist:approve') && (isAuthor || (version.reviewerId && !isReviewer))
         ? isAuthor
-          ? 'You wrote or submitted this version, so the named reviewer must publish or return it.'
+          ? 'You wrote this version, so the named reviewer must publish or return it.'
           : 'Only the named reviewer can publish or return this version.'
         : null,
   };

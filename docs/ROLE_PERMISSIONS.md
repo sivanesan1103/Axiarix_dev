@@ -43,7 +43,7 @@ An administrator can remove chosen permissions from one person without changing 
 
 | Rule | Enforcement |
 |---|---|
-| A checklist is published by its named reviewer, never by its author | `submit-review` requires a reviewer; `publish` checks the caller |
+| A checklist needs two people: the author and one named reviewer, who publishes it. The reviewer is anyone with approval rights except the version's author (the submitter may be the reviewer). New versions: the creator of the version is its author | `submit-review` requires a reviewer; `publish` checks the caller |
 | Whoever prepared an assessment (owner, anyone who answered, the submitter) cannot audit it | `sodBlockReason` / `assertSod` |
 | Preparers and the auditor cannot approve it | same |
 | The owner or submitter of a corrective action cannot verify it | `verifyAction` |
