@@ -59,6 +59,7 @@ export interface Settings {
   'workflow.policy': { approvalRequiredByDefault: boolean; clarificationEnabled: boolean; requireAuditorAcceptanceForNA: boolean };
   'security.policy': { enforceMfaForPrivileged: boolean; maxFailedLogins: number; lockoutMinutes: number };
   'notification.policy': { emailEnabled: boolean; events: Record<string, boolean>; deadlineReminderDays: number };
+  'locale.config': { timeZone: string };
   'report.config': { headerTitle: string; footerText: string; signOffRoles: string[]; includeEvidenceList: boolean };
 }
 

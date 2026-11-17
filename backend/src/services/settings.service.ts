@@ -26,6 +26,17 @@ export const settingSchemas = {
     events: z.record(z.boolean()),
     deadlineReminderDays: z.number().int().min(0).max(60),
   }),
+  /** Dates and times are stored in UTC and shown in this IANA time zone (SRS 2.3, NFR-10). */
+  'locale.config': z.object({
+    timeZone: z.string().refine((tz) => {
+      try {
+        new Intl.DateTimeFormat('en-GB', { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Unknown time zone'),
+  }),
   'report.config': z.object({
     headerTitle: z.string().min(1).max(200),
     footerText: z.string().max(500),
@@ -57,6 +68,7 @@ export const settingDefaults: { [K in SettingKey]: SettingValue<K> } = {
     events: Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, true])),
     deadlineReminderDays: 3,
   },
+  'locale.config': { timeZone: 'Asia/Kolkata' },
   'report.config': {
     headerTitle: 'ISO/IEC 27001:2022 Internal Assessment Report',
     footerText:

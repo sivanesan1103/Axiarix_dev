@@ -172,13 +172,50 @@ function useSettings(enabled = true) {
   return useQuery({ queryKey: ['settings'], queryFn: adminService.settings, enabled });
 }
 
-function SaveSetting<K extends keyof Settings>({ k, value, disabled }: { k: K; value: Settings[K]; disabled?: boolean }) {
+function SaveSetting<K extends keyof Settings>({ k, value, disabled, onSaved }: { k: K; value: Settings[K]; disabled?: boolean; onSaved?: () => void }) {
   const qc = useQueryClient();
-  const m = useMutation({ mutationFn: () => adminService.saveSetting(k, value), onSuccess: () => (toast.success('Settings saved'), qc.invalidateQueries({ queryKey: ['settings'] })) });
+  const m = useMutation({ mutationFn: () => adminService.saveSetting(k, value), onSuccess: () => (toast.success('Settings saved'), qc.invalidateQueries({ queryKey: ['settings'] }), onSaved?.()) });
   return (
     <Button variant="primary" disabled={disabled} loading={m.isPending} onClick={() => m.mutate()}>
       Save
     </Button>
+  );
+}
+
+/** Common zones first; the full IANA list follows where the browser provides it. */
+const COMMON_ZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'UTC'];
+function allZones(): string[] {
+  const intl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
+  const rest = intl.supportedValuesOf?.('timeZone') ?? [];
+  return [...COMMON_ZONES, ...rest.filter((z) => !COMMON_ZONES.includes(z))];
+}
+
+function RegionalCard({ s, canEdit }: { s: Settings; canEdit: boolean }) {
+  const { reload } = useAuth();
+  const [loc, setLoc] = useState(s['locale.config']);
+  const now = new Date();
+  let preview = '';
+  try {
+    preview = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: loc.timeZone }).format(now);
+  } catch {
+    preview = '—';
+  }
+  return (
+    <Card>
+      <CardHeader title="Regional settings" description="Dates and times are stored in UTC and shown in this time zone on every screen and in final reports." actions={canEdit && <SaveSetting k="locale.config" value={loc} onSaved={() => void reload()} />} />
+      <CardBody className="space-y-2">
+        <Field label="Time zone" htmlFor="tz">
+          <NativeSelect id="tz" disabled={!canEdit} value={loc.timeZone} onChange={(e) => setLoc({ timeZone: e.target.value })}>
+            {allZones().map((z) => (
+              <option key={z} value={z}>
+                {z.replaceAll('_', ' ')}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <p className="text-[13px] text-muted">Now in this zone: {preview}</p>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -232,6 +269,7 @@ function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
           </Field>
         </CardBody>
       </Card>
+      <RegionalCard s={s} canEdit={canEdit} />
     </div>
   );
 }

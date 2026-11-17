@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, ChevronDown, ClipboardCheck, FileCheck2, ShieldCheck, Wrench } from 'lucide-react';
@@ -6,6 +6,7 @@ import { useFilters } from '@/contexts/FilterContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardService } from '@/services/reports.service';
 import { assessmentsService } from '@/services/assessments.service';
+import { organisationService } from '@/services/organisation.service';
 import { Card, CardBody, CardHeader, Progress, Table, TD, TH, THead, TR, Avatar } from '@/components/ui/display';
 import { CountBars, PercentBars, StatusPie, TrendLine } from '@/components/dashboard/charts';
 import { EmptyState, ErrorState, LoadingRows, SearchInput, StatusBadge } from '@/components/common';
@@ -62,12 +63,15 @@ function StatusCountsRow({ d }: { d: DashboardSummary }) {
   );
 }
 
-function AssessmentsTable() {
+function AssessmentsTable({ departmentId }: { departmentId: string }) {
   const navigate = useNavigate();
   const { siteId, periodLabel } = useFilters();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const q = useQuery({ queryKey: ['assessments', 'dash', siteId, periodLabel, search, status], queryFn: () => assessmentsService.list({ siteId, periodLabel, search, status, pageSize: 6 }) });
+  const q = useQuery({
+    queryKey: ['assessments', 'dash', siteId, periodLabel, departmentId, search, status],
+    queryFn: () => assessmentsService.list({ siteId, periodLabel, departmentId: departmentId || undefined, search, status, pageSize: 6 }),
+  });
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-3 px-5 py-5">
@@ -202,7 +206,13 @@ export function DashboardPage() {
   const { siteId, periodLabel } = useFilters();
   const { user, can } = useAuth();
   const [chartMode, setChartMode] = useState<'clause' | 'annex'>('clause');
-  const q = useQuery({ queryKey: ['dashboard', siteId, periodLabel], queryFn: () => dashboardService.summary({ siteId, periodLabel }) });
+  const [compare, setCompare] = useState<'branch' | 'department'>('branch');
+  // Department filter (FR-021): departments of the branch picked in the top bar, or of every branch in scope.
+  const [departmentId, setDepartmentId] = useState('');
+  const org = useQuery({ queryKey: ['org'], queryFn: organisationService.current });
+  const departments = (org.data?.sites ?? []).filter((s) => !siteId || s.id === siteId).flatMap((s) => s.departments.map((dep) => ({ id: dep.id, label: siteId ? dep.name : `${s.name} / ${dep.name}` })));
+  useEffect(() => setDepartmentId(''), [siteId]);
+  const q = useQuery({ queryKey: ['dashboard', siteId, periodLabel, departmentId], queryFn: () => dashboardService.summary({ siteId, periodLabel, departmentId: departmentId || undefined }) });
 
   if (q.isLoading)
     return (
@@ -220,7 +230,19 @@ export function DashboardPage() {
         <p className="text-sm text-muted">
           Welcome back, <span className="font-medium text-ink">{user?.name.split(' ')[0]}</span>. {d.assessmentsCount} assessment(s) in this view{periodLabel ? ` for ${periodLabel}` : ''}.
         </p>
-        {d.scoringNote && <p className="text-xs text-faint">{d.scoringNote}</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          {departments.length > 1 && (
+            <select aria-label="Department filter" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="h-9 max-w-[280px] rounded-lg border border-line bg-surface px-3 text-sm">
+              <option value="">All departments</option>
+              {departments.map((dep) => (
+                <option key={dep.id} value={dep.id}>
+                  {dep.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {d.scoringNote && <p className="text-xs text-faint">{d.scoringNote}</p>}
+        </div>
       </div>
 
       <KpiStrip d={d} />
@@ -269,7 +291,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px] [&>*]:min-w-0">
-        <AssessmentsTable />
+        <AssessmentsTable departmentId={departmentId} />
         <PendingTasks />
       </div>
 
@@ -311,9 +333,38 @@ export function DashboardPage() {
           <CardBody>{d.trend.length ? <TrendLine data={d.trend} /> : <EmptyState title="No periods yet" />}</CardBody>
         </Card>
         <Card>
-          <CardHeader title="Branch comparison" description="Consolidated vs site-wise (BR-09)" />
+          <CardHeader
+            title={compare === 'branch' ? 'Branch comparison' : 'Department comparison'}
+            description={compare === 'branch' ? 'Consolidated vs site-wise (BR-09)' : 'Compliance by department'}
+            actions={
+              <select aria-label="Compare by" value={compare} onChange={(e) => setCompare(e.target.value as 'branch' | 'department')} className="h-8 rounded-md border border-line bg-surface px-2 text-[13px]">
+                <option value="branch">Branches</option>
+                <option value="department">Departments</option>
+              </select>
+            }
+          />
           <CardBody>
-            {d.branchComparison.length ? (
+            {compare === 'department' ? (
+              d.departmentComparison.length ? (
+                <ul className="space-y-4">
+                  {d.departmentComparison.map((b) => (
+                    <li key={b.departmentId}>
+                      <div className="mb-1.5 flex justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate font-medium" title={`${b.site} / ${b.department}`}>
+                          {b.department} <span className="font-normal text-muted">· {b.site}</span>
+                        </span>
+                        <span className="shrink-0 tabular text-muted">
+                          {formatPercent(b.compliancePercent)} · {b.assessments}
+                        </span>
+                      </div>
+                      <Progress value={b.compliancePercent} className="h-2.5" />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState title="No department data yet" />
+              )
+            ) : d.branchComparison.length ? (
               <ul className="space-y-4">
                 {d.branchComparison.map((b) => (
                   <li key={b.siteId}>

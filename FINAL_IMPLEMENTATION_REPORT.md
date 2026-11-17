@@ -4,6 +4,18 @@ Hospital IT pilot · Kauvery Hospitals Group – Vadapalani – IT & IT Data Cen
 
 All results below were produced by commands executed on the local development stack in this session. Nothing is marked complete without a test or a verified run, and limitations are stated explicitly in section G.
 
+## Update – 17 November 2026
+
+Since this report was first written (13 November), the following has been added and checked. The full, current requirement-by-requirement check against the BRD and SRS is [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md); where it differs from section C below, the traceability document is current.
+
+- **Several organisations per installation** with a platform owner, a 5-step creation wizard and Excel setup workbook; suspend and reactivate.
+- **Governance:** per-user permission restrictions; branch-scoped administrators; nobody changes their own access; separation of duties (named checklist reviewer, preparers cannot audit, preparers and auditors cannot approve, action owners cannot verify).
+- **Task flow:** work can only be given to people in the record's branch and department; **Change owner** for open assessments; Pending tasks cover every kind of work; finding owners of any role plan corrective actions.
+- **Audit review:** every answer and evidence file needs a decision before the review can be submitted; accepting a file does not accept the answer.
+- **Requirement gaps closed on 17 Nov:** search covers checklist questions (FR-027); dashboard department filter and per-department comparison (FR-021, BRD §9); configurable display time zone used on screens and in PDF reports (SRS 2.3, NFR-10).
+- **Tests now:** backend 69 passed (5 files), frontend unit 11, Playwright 2 (run twice); lint and type checks clean. Whole workflow run by hand in Chrome with five users of a second organisation (Meridian Diagnostics).
+- **NFR-01 measurement:** 12,133 API reads on the local server — median 12 ms, 95th percentile 49 ms, slowest 753 ms.
+
 ---
 
 ## A. Development summary
@@ -95,13 +107,13 @@ All results below were produced by commands executed on the local development st
 | FR-018 | Lifecycle statuses with timestamps and actors | StatusHistory | AT-11 history check | Pass |
 | FR-019 | Notifications | notification.service, reminders | AT-06; Mailpit delivery observed | Pass |
 | FR-020 | Dashboard | dashboard routes | AT-07, AT-12 | Pass |
-| FR-021 | Filters by period, site, department, clause, status | dashboard and list filters | AT-12 | Pass |
+| FR-021 | Filters by period, site, department, clause, status | dashboard and list filters; dashboard department filter and per-department comparison added 17 Nov | AT-12; `requirements.test › FR-021` | Pass |
 | FR-022 | Final PDF after approval | generateFinalReport | AT-09 | Pass |
 | FR-023 | Central report repository | `/reports`, ReportsPage | AT-09 | Pass |
 | FR-024 | CSV/XLSX export | export endpoints | Export test | Pass |
 | FR-025 | Audit log of critical actions | recordAudit across services | audit tests | Pass |
 | FR-026 | Reopen with mandatory reason and audit | reopen | AT-11 | Pass |
-| FR-027 | Search within access scope | `/search`, list searches | Not automated | Implemented, untested |
+| FR-027 | Search within access scope | `/search` (incl. checklist questions since 17 Nov), list searches | `requirements.test › FR-027` | Pass |
 | FR-028 | Retention and archival rules | admin.service applyRetention, deletion workflow | Not automated | Implemented, untested |
 
 ### Non-functional and security requirements
@@ -120,13 +132,13 @@ All results below were produced by commands executed on the local development st
 | NFR-SEC-10 Admin access recorded | All admin actions audited | Audit tests | Pass (DB access is infra) |
 | NFR-SEC-11 Retention and secure deletion | Policies + two-person deletion | Not automated | Implemented, untested |
 | NFR-SEC-12 No PHI as evidence | Upload dialog warning; classification field | — | Guidance only |
-| NFR-01 Performance | Indexed queries; code-split SPA; observed API latencies of a few ms to ~40 ms locally | Informal | Not load-tested |
+| NFR-01 Performance | Indexed queries; code-split SPA | 17 Nov: 12,133 local API reads, p95 49 ms, max 753 ms | Measured locally; not load-tested |
 | NFR-03 Scalability | Multi-site/department data model | AT-01, AT-12 | Pass |
 | NFR-04 Usability | Guided workspace, inline validation, jump-to-missing on submit | E2E | Pass |
 | NFR-05 Compatibility | Chromium verified | E2E (Chromium only) | Partial |
 | NFR-08 Auditability | Every transition attributed to user and time | AT-11, audit tests | Pass |
 | NFR-09 Accessibility | Labels, keyboard-operable Radix controls, focus rings, radio-group semantics, contrast tokens | Component tests use accessible queries | Partial (no formal audit) |
-| NFR-10 Localisation | English; dates shown in the browser's time zone | — | Pass |
+| NFR-10 Localisation | English; organisation time zone in Settings → Regional settings (since 17 Nov), used by screens and PDF | `requirements.test › NFR-10` | Pass |
 
 ## D. Test results (executed 2026-11-13)
 
@@ -165,7 +177,7 @@ All results below were produced by commands executed on the local development st
 
 **Missing or partial functionality**
 - MFA enforcement for privileged roles is a prompt at sign-in, not a hard block until enrolment.
-- Retention runs, secure deletion, assessment schedules and global search are implemented but have no automated tests.
+- Retention runs, secure deletion and assessment schedules are implemented but have no automated tests (global search is now tested).
 - The ClamAV adapter has not been exercised against a running clamd; only the built-in heuristic scanner is verified. The built-in scanner is not a substitute for an AV engine in production.
 - Permissions are the union across a user's roles (not per scope); see ROLE_PERMISSIONS.md.
 - SSO (SAML/OIDC) is not implemented; out of scope until the hospital confirms its identity provider.

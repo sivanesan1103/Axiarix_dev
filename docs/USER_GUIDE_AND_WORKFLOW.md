@@ -562,7 +562,8 @@ Every page in the app, what it is for, who sees it and its main actions. Screens
 | Corrective actions | Whoever owns a finding, including an IT Control Owner, can plan its corrective action |
 | Checklist review | The reviewer list is based on approval permission; only the reviewer or the comment's author resolves a comment |
 | Screens | Pop-up forms keep their buttons on screen in short windows; role changes appear without reloading |
-| Quality | 65 backend, 11 frontend and 2 browser tests pass; the whole workflow was run in Chrome with five Meridian users |
+| BRD / SRS check | Every requirement checked against the app ([REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md)). Added: search finds checklist questions; dashboard department filter and *Department comparison*; **Settings → Workflow & uploads → Regional settings → Time zone**, used on every screen and in final reports (default Asia/Kolkata) |
+| Quality | 69 backend, 11 frontend and 2 browser tests pass; the whole workflow was run in Chrome with five Meridian users |
 
 ## Release notes – 16 November 2026
 

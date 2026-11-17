@@ -1,6 +1,7 @@
 # Axiarix – Project Progress & Running History
 
-> Living log. Updated after each phase. Last update: **2026-11-13** (session 1 – all 8 phases complete).
+> Living log. Updated after each phase. Last update: **2026-11-17** (multi-organisation governance, task-flow fixes, BRD/SRS traceability check).
+> On this machine Postgres runs on **5434** and the web on **5174** (5433/5173 belong to another project); see README.
 > Source of truth: `../prompt.md`, BRD, SRS and the Kauvery Excel checklist in the parent folder.
 > UI/UX theme reference: `../Screenshot 2026-11-13 at 3.52.31 PM.png` (white canvas, icon-rail sidebar, vivid indigo `#4B10F0`, lavender tints, green/amber accents, KPI strip, clean tables).
 > Handwritten requirements note (`../WhatsApp Image …jpeg`) — 8 points, all covered: central checklist, periodic updates, quarterly IA, central evidence, unit-wise (branch) reports, auditor verification, final PDF after auditor update, dashboard + central report storage.
@@ -106,3 +107,17 @@ Hosting, identity/SSO & MFA enforcement, exact quarterly calendar, checklist/SoA
   - Added per-account dev addresses (`<name>.localhost:5173`) with `?email=` prefill so several accounts can be signed in side by side in one Chrome profile.
   - Added dark mode (Light / Dark / System): token remap, top-bar toggle, Settings → Appearance, pre-paint script, themed charts and toasts. Verified in a dark render; frontend unit 11/11; E2E 2/2 in 3 of 4 runs (one intermittent visibility timeout).
   - Not done automatically: dev DB reset (Prisma requires explicit user consent) – dev DB still contains "E2E" records; run `cd backend && npm run db:reset` to restore clean demo data.
+
+- **S2 – 2026-11-16**
+  - Full dev DB reset (with consent). Added several organisations per installation (platform owner, wizard, setup workbook), per-user restrictions, branch administrators and separation of duties; per-organisation settings and roles (migration `multi_org_restrictions_review`).
+  - UI: grouped sidebar, Scope button, URL filters, Admin Home, period pickers, checklist review with named reviewer and comments.
+  - Created Meridian Diagnostics (Sample) through the wizard in Chrome; 9 users accepted invitations; fixed 5 bugs found during onboarding.
+  - Fixed review and task flow: every answer and file needs a decision; assignees limited to the record's department; Change owner; Pending tasks for every role; finding owners plan actions; restricted buttons hidden; dialog buttons visible on short screens. Whole workflow run in Chrome with five Meridian users.
+  - Pushed to GitHub (`main`, then branch `fix/task-flow-and-audit-review`).
+
+- **S3 – 2026-11-17**
+  - Checked every BRD and SRS requirement against the app: `docs/REQUIREMENTS_TRACEABILITY.md`.
+  - Closed three gaps: checklist question search (FR-027), dashboard department filter and comparison (FR-021), configurable display time zone for screens and PDF (SRS 2.3, NFR-10). New `backend/tests/requirements.test.ts`.
+  - Updated API, roles, database, architecture, testing, short user guide and final report docs.
+  - Tests: backend 69/69, frontend 11/11, E2E 2/2.
+

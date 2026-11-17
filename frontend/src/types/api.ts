@@ -27,6 +27,8 @@ export interface SessionUser {
   isPlatformOwner: boolean;
   /** Permissions an administrator removed from this user (their role still includes them). */
   restrictions: { permission: string; reason: string; expiresAt: string | null }[];
+  /** Organisation display time zone (IANA), e.g. Asia/Kolkata. */
+  timeZone?: string;
 }
 
 export interface Department {
@@ -402,6 +404,7 @@ export interface DashboardSummary {
   findingsByStatus: { status: string; count: number }[];
   actionProgress: { status: string; count: number }[];
   branchComparison: { siteId: string; site: string; assessments: number; compliancePercent: number | null; counts: StatusCounts }[];
+  departmentComparison: { departmentId: string; department: string; siteId: string; site: string; assessments: number; compliancePercent: number | null }[];
   trend: { period: string; assessments: number; compliancePercent: number | null }[];
   recentActivity: { id: string; action: string; entityType: string; entityId: string | null; actorEmail: string | null; createdAt: string; metadata: Record<string, unknown> | null; actor: { name: string } | null }[];
 }

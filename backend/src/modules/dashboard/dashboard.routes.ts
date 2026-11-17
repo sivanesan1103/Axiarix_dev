@@ -37,6 +37,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     include: {
       scoringPolicy: true,
       site: { select: { id: true, name: true } },
+      department: { select: { id: true, name: true } },
       checklistVersion: { include: { items: { where: { status: 'ACTIVE' }, include: { mappings: true } } } },
       responses: { select: { itemId: true, status: true } },
       evidence: { where: { deletedAt: null, itemId: { not: null } }, select: { itemId: true, verificationStatus: true, deletedAt: true, versions: { orderBy: { version: 'desc' }, take: 1, select: { scanStatus: true } } } },
@@ -57,6 +58,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
   const themeAgg = new Map<string, StatusCounts>();
   const controlAgg = new Map<string, StatusCounts>();
   const siteAgg = new Map<string, { name: string; earned: number; denominator: number; assessments: number; counts: StatusCounts }>();
+  const deptAgg = new Map<string, { name: string; site: string; siteId: string; earned: number; denominator: number; assessments: number }>();
   const periodAgg = new Map<string, { start: Date; earned: number; denominator: number; assessments: number }>();
   const add = (m: Map<string, StatusCounts>, k: string, s: ResponseStatus) => {
     const c = m.get(k) ?? emptyCounts();
@@ -91,6 +93,11 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     site.assessments++;
     (Object.keys(counts) as ResponseStatus[]).forEach((k) => (site.counts[k] += counts[k]));
     siteAgg.set(a.siteId, site);
+    const dept = deptAgg.get(a.departmentId) ?? { name: a.department.name, site: a.site.name, siteId: a.siteId, earned: 0, denominator: 0, assessments: 0 };
+    dept.earned += s.earned;
+    dept.denominator += s.denominator;
+    dept.assessments++;
+    deptAgg.set(a.departmentId, dept);
     const p = periodAgg.get(a.periodLabel) ?? { start: a.periodStart, earned: 0, denominator: 0, assessments: 0 };
     p.earned += s.earned;
     p.denominator += s.denominator;
@@ -155,6 +162,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     findingsBySeverity: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'OBSERVATION'].map((s) => ({ severity: s, count: findingsBySeverity.find((x) => x.severity === s)?._count ?? 0 })),
     findingsByStatus: findingsByStatus.map((x) => ({ status: x.status, count: x._count })),
     actionProgress: ['PLANNED', 'IN_PROGRESS', 'RETURNED', 'SUBMITTED_FOR_VERIFICATION', 'VERIFIED'].map((s) => ({ status: s, count: actionStatus.find((x) => x.status === s)?._count ?? 0 })),
+    departmentComparison: [...deptAgg.entries()].map(([id, d]) => ({ departmentId: id, department: d.name, siteId: d.siteId, site: d.site, assessments: d.assessments, compliancePercent: pctOf(d.earned, d.denominator) })),
     branchComparison: [...siteAgg.entries()].map(([id, s]) => ({ siteId: id, site: s.name, assessments: s.assessments, compliancePercent: pctOf(s.earned, s.denominator), counts: s.counts })),
     trend: [...periodAgg.entries()].sort((a, b) => a[1].start.getTime() - b[1].start.getTime()).map(([period, p]) => ({ period, assessments: p.assessments, compliancePercent: pctOf(p.earned, p.denominator) })),
     recentActivity,

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { refreshAccessToken, tokenStore } from '@/api/client';
 import { authService } from '@/services/auth.service';
+import { setDisplayTimeZone } from '@/lib/utils';
 import type { RoleKey, SessionUser } from '@/types/api';
 
 interface AuthState {
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     const me = await authService.me();
+    setDisplayTimeZone(me.timeZone);
     setUser(me);
     setStatus('authenticated');
   }, []);
@@ -61,7 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authService
         .me()
         .catch(async () => ((await refreshAccessToken()) ? authService.me() : Promise.reject(new Error('signed out'))))
-        .then(setUser)
+        .then((me) => {
+          setDisplayTimeZone(me.timeZone);
+          setUser(me);
+        })
         .catch(() => undefined);
     };
     const t = setInterval(refresh, 60_000);
@@ -75,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string, mfaCode?: string) => {
     const r = await authService.login(email, password, mfaCode);
     if (r.mfaRequired || !r.user) return { mfaRequired: true };
+    setDisplayTimeZone(r.user.timeZone);
     setUser(r.user);
     setStatus('authenticated');
     return { mfaRequired: false, mfaEnrolmentRequired: r.mfaEnrolmentRequired };

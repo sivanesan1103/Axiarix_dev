@@ -33,6 +33,8 @@ npm install
 npm run dev                                   # Web → http://localhost:5173
 ```
 
+If ports 5433 or 5173 are already used by another project, map Postgres to another port with a compose override (for example 5434), set `DATABASE_URL` to match, and start the web with `npx vite --port 5174 --strictPort` and `FRONTEND_ORIGIN=http://localhost:5174` for the API.
+
 | URL | |
 |---|---|
 | Web app | http://localhost:5173 |
@@ -110,7 +112,8 @@ See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* 
 - [docs/review/axiarix-fix-plan.html](docs/review/axiarix-fix-plan.html) – review findings and fix plan with mockups
 - [docs/demo/](docs/demo/) – captioned feature tour video and Chrome recordings
 - [sample-files/](sample-files/README.md) – fictitious Excel workbooks and business evidence documents for testing
-- - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – architecture, modules, security design
+- [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) – every BRD and SRS requirement mapped to code, tests and results
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – architecture, modules, security design
 - [docs/DATABASE.md](docs/DATABASE.md) – data model, integrity triggers, migrations, seeding
 - [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) – REST endpoints
 - [docs/ROLE_PERMISSIONS.md](docs/ROLE_PERMISSIONS.md) – RBAC matrix and scope rules

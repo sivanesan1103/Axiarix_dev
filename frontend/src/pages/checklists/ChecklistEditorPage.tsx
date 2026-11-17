@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -311,7 +311,9 @@ export function ChecklistEditorPage() {
   const { id = '', versionId = '' } = useParams();
   const { can } = useAuth();
   const qc = useQueryClient();
-  const [filters, setFilters] = useState({ search: '', priority: '', clause: '', needsReview: '' });
+  // A link from global search opens the editor filtered to that question.
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState({ search: params.get('search') ?? '', priority: '', clause: '', needsReview: '' });
   const q = useQuery({ queryKey: ['version', versionId, filters], queryFn: () => checklistsService.version(versionId, filters) });
   const refs = useQuery({ queryKey: ['iso-refs'], queryFn: checklistsService.isoReferences, staleTime: Infinity });
   const [dlg, setDlg] = useState<{ open: boolean; item?: ChecklistItem }>({ open: false });
