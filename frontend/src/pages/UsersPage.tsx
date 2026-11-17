@@ -352,9 +352,18 @@ function UsersTab() {
                   <TD>{u.mfaEnabled ? <Badge tone="ok">Enabled</Badge> : <Badge>Off</Badge>}</TD>
                   <TD className="text-[13px] text-muted">{formatDateTime(u.lastLoginAt)}</TD>
                   <TD>
-                    <Badge tone={u.status === 'ACTIVE' ? 'ok' : 'neutral'} dot>
-                      {u.status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                    </Badge>
+                    {/* An active account that has never signed in is still waiting on its invitation. */}
+                    {u.status !== 'ACTIVE' ? (
+                      <Badge dot>Inactive</Badge>
+                    ) : u.lastLoginAt ? (
+                      <Badge tone="ok" dot>
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge tone="warn" dot>
+                        Invited
+                      </Badge>
+                    )}
                   </TD>
                   <TD>
                     {(can('user:update') || can('role:assign')) && u.canManage && (
