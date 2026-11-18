@@ -1,7 +1,9 @@
 node_modules
 dist
 .env
-storage
+# Uploaded evidence/report files (LOCAL_STORAGE_DIR); not the storage source code
+/storage/
+/backend/storage/
 coverage
 playwright-report
 test-results
