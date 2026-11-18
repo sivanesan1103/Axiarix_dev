@@ -33,6 +33,8 @@ npm install
 npm run dev                                   # Web → http://localhost:5173
 ```
 
+If ports 5433 or 5173 are already used by another project, map Postgres to another port with a compose override (for example 5434), set `DATABASE_URL` to match, and start the web with `npx vite --port 5174 --strictPort` and `FRONTEND_ORIGIN=http://localhost:5174` for the API.
+
 | URL | |
 |---|---|
 | Web app | http://localhost:5173 |
@@ -72,7 +74,7 @@ The seed imports both worksheets of `backend/source-data/kauvery-vadapalani-it-i
 - **Periods** are fixed formats on the Indian financial year: `Q3 FY2026-27`, `H1 FY2026-27`, `FY2026-27`. Dates are derived from the label.
 - **Filters:** the *Scope* button in the top bar (branch · period) applies to the dashboard and every list. List filters are kept in the page link, so refresh, Back and shared links keep the same view.
 
-See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* organisation and checklist workbooks.
+See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* organisation and checklist workbooks, and `docs/DEMO_WALKTHROUGH.md` for *Green Valley Clinic (Demo)*, a one-person-per-role organisation for walking the whole workflow in Chrome.
 
 ### Try the full workflow
 
@@ -110,7 +112,8 @@ See `sample-org/README.md` for the fictitious *Sunrise Care Hospitals (Sample)* 
 - [docs/review/axiarix-fix-plan.html](docs/review/axiarix-fix-plan.html) – review findings and fix plan with mockups
 - [docs/demo/](docs/demo/) – captioned feature tour video and Chrome recordings
 - [sample-files/](sample-files/README.md) – fictitious Excel workbooks and business evidence documents for testing
-- - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – architecture, modules, security design
+- [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) – every BRD and SRS requirement mapped to code, tests and results
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – architecture, modules, security design
 - [docs/DATABASE.md](docs/DATABASE.md) – data model, integrity triggers, migrations, seeding
 - [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) – REST endpoints
 - [docs/ROLE_PERMISSIONS.md](docs/ROLE_PERMISSIONS.md) – RBAC matrix and scope rules

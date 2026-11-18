@@ -7,10 +7,10 @@ import { prisma } from '../../config/prisma.js';
 import { PRIVILEGED_ROLES, type RoleKey } from '../../constants/permissions.js';
 import { recordAudit, recordAuditSafe } from '../../services/audit.service.js';
 import { getSetting } from '../../services/settings.service.js';
-import { notifyPasswordReset } from './auth.mail.js';
+import { notifyInvitation, notifyPasswordReset } from './auth.mail.js';
 import { loadAuthUser } from '../../middleware/auth.js';
 import type { AuthUser } from '../../types/auth.js';
-import { AppError, badRequest, unauthorized } from '../../utils/errors.js';
+import { AppError, badRequest, forbidden, unauthorized } from '../../utils/errors.js';
 import {
   decryptSecret,
   encryptSecret,
@@ -62,6 +62,7 @@ export function publicUser(u: AuthUser) {
     mfaEnabled: u.mfaEnabled,
     isPlatformOwner: u.isPlatformOwner,
     restrictions: u.restrictions,
+    mfaEnrolmentRequired: !!u.mfaEnrolmentRequired,
   };
 }
 
@@ -127,12 +128,13 @@ export async function login(req: Request, email: string, password: string, mfaCo
   const { token } = await issueRefreshToken(user.id, req);
   await recordAudit({ req, action: 'LOGIN', entityType: 'User', entityId: user.id, actorId: user.id, actorEmail: user.email, organisationId: user.organisationId });
   const privileged = authUser.roles.some((r) => PRIVILEGED_ROLES.includes(r as RoleKey));
+  authUser.mfaEnrolmentRequired = security.enforceMfaForPrivileged && privileged && !user.mfaEnabled && !authUser.isPlatformOwner;
   return {
     mfaRequired: false,
     accessToken: signAccessToken(user.id),
     refreshToken: token,
     user: publicUser(authUser),
-    mfaEnrolmentRequired: security.enforceMfaForPrivileged && privileged && !user.mfaEnabled,
+    mfaEnrolmentRequired: authUser.mfaEnrolmentRequired,
   };
 }
 
@@ -167,18 +169,29 @@ export async function logout(req: Request, presented: string | undefined) {
 }
 
 const RESET_TTL_MS = 30 * 60_000;
+const INVITE_TTL_MS = 72 * 60 * 60_000;
 
-/** Always succeeds from the caller's perspective to avoid revealing which e-mails exist. */
-export async function forgotPassword(req: Request, email: string): Promise<string | null> {
+/**
+ * Always succeeds from the caller's perspective to avoid revealing which e-mails exist.
+ * `invite` is used when an administrator adds someone: the e-mail welcomes them, asks them to *set* a
+ * password and the link stays valid for 72 hours instead of 30 minutes.
+ */
+export async function forgotPassword(req: Request, email: string, opts: { invite?: boolean } = {}): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (!user || user.status !== 'ACTIVE') return null;
   const token = randomToken(32);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordResetHash: sha256(token), passwordResetExpires: new Date(Date.now() + RESET_TTL_MS) },
+    data: { passwordResetHash: sha256(token), passwordResetExpires: new Date(Date.now() + (opts.invite ? INVITE_TTL_MS : RESET_TTL_MS)) },
   });
-  await recordAuditSafe({ req, action: 'PASSWORD_RESET_REQUESTED', entityType: 'User', entityId: user.id, actorId: user.id, actorEmail: user.email });
-  await notifyPasswordReset(user.email, user.name, token);
+  if (opts.invite) {
+    await recordAuditSafe({ req, action: 'USER_INVITED', entityType: 'User', entityId: user.id, metadata: { email: user.email } });
+    const org = user.organisationId ? await prisma.organisation.findUnique({ where: { id: user.organisationId }, select: { name: true } }) : null;
+    await notifyInvitation(user.email, user.name, token, org?.name);
+  } else {
+    await recordAuditSafe({ req, action: 'PASSWORD_RESET_REQUESTED', entityType: 'User', entityId: user.id, actorId: user.id, actorEmail: user.email });
+    await notifyPasswordReset(user.email, user.name, token);
+  }
   return token;
 }
 
@@ -233,6 +246,8 @@ export async function mfaEnable(req: Request, code: string) {
 export async function mfaDisable(req: Request, password: string, code: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
   if (!user.mfaEnabled || !user.mfaSecret) throw badRequest('MFA is not enabled');
+  const security = await getSetting('security.policy', user.organisationId);
+  if (security.enforceMfaForPrivileged && req.user!.roles.some((r) => PRIVILEGED_ROLES.includes(r))) throw forbidden('Your role requires two-step verification, so it cannot be switched off');
   if (!(await bcrypt.compare(password, user.passwordHash))) throw badRequest('Password is incorrect');
   if (!verifyTotp(decryptSecret(user.mfaSecret), code)) throw badRequest('Invalid verification code');
   await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecret: null } });

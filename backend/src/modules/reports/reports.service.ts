@@ -16,7 +16,17 @@ const STATUS_LABEL: Record<string, string> = {
   NOT_APPLICABLE: 'Not applicable',
   NOT_ASSESSED: 'Not assessed',
 };
-const fmtDate = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : '-');
+// Calendar dates (stored as midnight UTC) print as that day; timestamps print in the organisation's time zone.
+const isCalendarDate = (d: Date) => d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+const zoned = (d: Date, withTime: boolean, timeZone: string) => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}${withTime ? ` ${parts.hour}:${parts.minute}:${parts.second}` : ''}`;
+};
+const dateFormatter = (timeZone: string) => (d: Date | null | undefined) => (d ? (isCalendarDate(d) ? d.toISOString().slice(0, 10) : zoned(d, false, timeZone)) : '-');
 const pct = (v: number | null) => (v == null ? 'n/a' : `${v}%`);
 
 /** Plain-language summary derived only from recorded data – no invented conclusions. */
@@ -63,7 +73,9 @@ export async function generateFinalReport(req: Request, assessmentId: string) {
   const baseCode = previous?.code.replace(/-v\d+$/, '') ?? (await nextCode('RPT'));
   const code = `${baseCode}-v${version}`;
   const generatedAt = new Date();
-  const stamp = generatedAt.toISOString().replace('T', ' ').slice(0, 19);
+  const { timeZone } = await getSetting('locale.config', a.organisationId);
+  const fmtDate = dateFormatter(timeZone);
+  const stamp = `${zoned(generatedAt, true, timeZone)} (${timeZone})`;
   const approval = a.approvals.find((x) => x.decision === 'APPROVED');
   const review = a.reviews[0];
   const openFindings = a.findings.filter((f) => f.status !== 'CLOSED');
@@ -86,7 +98,7 @@ export async function generateFinalReport(req: Request, assessmentId: string) {
     ['Assessment ID', a.code],
     ['Checklist version', `${a.checklistVersion.template.title} - v${a.checklistVersion.versionNumber}`],
     ['Report ID / version', `${baseCode} / v${version}`],
-    ['Report timestamp', `${stamp} UTC`],
+    ['Report timestamp', stamp],
     ['Department owner', a.owner.name],
     ['Approval status', approval ? `Approved by ${approval.approver.name} on ${fmtDate(approval.createdAt)}` : a.approvalRequired ? 'Approved' : 'Finalised after audit review (no separate approval configured)'],
   ]);

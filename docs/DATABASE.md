@@ -6,17 +6,17 @@ PostgreSQL 16, managed with Prisma 6 (`backend/prisma/schema.prisma`). All times
 
 | Area | Models |
 |---|---|
-| Organisation | `Organisation`, `Site`, `Department` |
-| Identity & access | `User`, `Role`, `Permission`, `RolePermission`, `UserRole` (role + organisation/site/department scope), `RefreshToken` |
+| Organisation | `Organisation` (`isPlatform` marks the platform owner's own organisation), `Site`, `Department` |
+| Identity & access | `User` (`isPlatformOwner`), `Role` (one set per organisation: unique `organisationId + key`), `Permission`, `RolePermission`, `UserRole` (role + organisation/site/department scope), `UserPermissionRestriction` (permission removed from one person, with reason and optional end date), `RefreshToken` |
 | Reference | `IsoReference` (clauses 4–10, Annex A 5.1–8.34) |
-| Checklists | `ChecklistTemplate`, `ChecklistVersion` (DRAFT → UNDER_REVIEW → PUBLISHED → ARCHIVED), `ChecklistItem`, `ControlMapping` (ISO_CLAUSE / ANNEX_A / INTERNAL_POLICY / RISK, `needsReview`) |
+| Checklists | `ChecklistTemplate`, `ChecklistVersion` (DRAFT → UNDER_REVIEW → PUBLISHED → ARCHIVED; `submittedById` and named `reviewerId`), `ChecklistItem`, `ControlMapping` (ISO_CLAUSE / ANNEX_A / INTERNAL_POLICY / RISK, `needsReview`), `ChecklistReviewComment` (reviewer comments per version or question, resolved by author or reviewer) |
 | Excel import | `ImportedChecklist` (file checksum, per-sheet summary and column map), `ImportedChecklistRow` (every original cell in `rawData`, plus worksheet and row number) |
 | Assessments | `Assessment` (pinned checklist version and scoring policy, lifecycle, round, reopen count), `AssessmentAssignment`, `AssessmentResponse`, `AssessmentSubmission` (immutable snapshot per submission round), `StatusHistory` |
 | Evidence | `Evidence` (links to response/item, finding, corrective action; classification; verification), `EvidenceVersion` (storage key, MIME type, size, SHA-256 checksum, scan status) |
 | Review | `AuditorReview` (item/evidence decisions and the overall opinion), `ReviewComment` (clarification threads) |
 | Findings | `Finding`, `CorrectiveAction`, `CorrectiveActionUpdate` |
 | Approval & reports | `Approval`, `Report` (versioned, frozen `summary`, storage key, checksum) |
-| Governance | `AuditEvent` (append-only, hash-chained), `Notification`, `ScoringPolicy` (versioned), `RetentionPolicy`, `DeletionRequest` (two-person rule), `AssessmentSchedule`, `SystemSetting` |
+| Governance | `AuditEvent` (append-only, hash-chained), `Notification`, `ScoringPolicy` (versioned), `RetentionPolicy`, `DeletionRequest` (two-person rule), `AssessmentSchedule`, `SystemSetting` (stored per organisation under `org:<id>:<key>`, e.g. `locale.config` for the display time zone) |
 
 Indexes cover scope columns (`organisationId, siteId, departmentId`), status fields, foreign keys used in lists, and audit queries (`entityType+entityId`, `actorId`, `createdAt`, `action`). Unique constraints include site code per organisation, question code per version, one response per (assessment, item), and report version per assessment.
 
@@ -39,7 +39,7 @@ npx prisma validate            # schema check
 npx prisma migrate dev         # create a new migration (development)
 ```
 
-Migrations: `init` · `integrity_triggers` · `iso_reference_id`.
+Migrations: `init` · `integrity_triggers` · `iso_reference_id` · `multi_org_restrictions_review` (per-organisation roles, platform owner, per-user restrictions, named checklist reviewer and review comments) · `deletion_request_organisation` (deletion requests belong to an organisation).
 
 ## Seeding
 

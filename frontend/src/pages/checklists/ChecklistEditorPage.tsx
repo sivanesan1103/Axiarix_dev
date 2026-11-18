@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { AlertTriangle, Archive, ArrowDown, ArrowUp, CheckCircle2, Download, Lock, MessageSquare, MoreHorizontal, Pencil, Plus, Send, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { checklistsService, type MappingPayload } from '@/services/checklists.service';
-import { usersService } from '@/services/users.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { errorDetails, errorMessage } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, Dropdown
 import { Field, Input, NativeSelect, Switch, Textarea } from '@/components/ui/form-controls';
 import { ConfirmDialog, EmptyState, ErrorState, LoadingRows, PageHeader, SearchInput, StatusBadge } from '@/components/common';
 import { UserSelect } from '@/components/common/pickers';
-import { CHECKLIST_STATUS, PRIORITY, ROLE_LABEL } from '@/constants/status';
+import { CHECKLIST_STATUS, PRIORITY } from '@/constants/status';
 import { cn, formatDateTime } from '@/lib/utils';
 import type { ChecklistItem, IsoReference } from '@/types/api';
 
@@ -126,23 +125,29 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
     setPrevItem(item);
     setMappings(initialMappings);
   }
-  const form = useForm<ItemForm>({
-    resolver: zodResolver(itemSchema),
-    values: {
-      question: item?.question ?? '',
-      description: item?.description ?? '',
-      guidance: item?.guidance ?? '',
-      internalPolicyRef: item?.internalPolicyRef ?? '',
-      riskRef: item?.riskRef ?? '',
-      evidenceRequirement: item?.evidenceRequirement ?? '',
-      evidenceMandatory: item?.evidenceMandatory ?? true,
-      responseMandatory: item?.responseMandatory ?? true,
-      defaultOwnerId: item?.defaultOwnerId ?? '',
-      priority: item?.priority ?? 'MEDIUM',
-      category: item?.category ?? '',
-      status: item?.status ?? 'ACTIVE',
-    },
+  const itemDefaults = (): ItemForm => ({
+    question: item?.question ?? '',
+    description: item?.description ?? '',
+    guidance: item?.guidance ?? '',
+    internalPolicyRef: item?.internalPolicyRef ?? '',
+    riskRef: item?.riskRef ?? '',
+    evidenceRequirement: item?.evidenceRequirement ?? '',
+    evidenceMandatory: item?.evidenceMandatory ?? true,
+    responseMandatory: item?.responseMandatory ?? true,
+    defaultOwnerId: item?.defaultOwnerId ?? '',
+    priority: item?.priority ?? 'MEDIUM',
+    category: item?.category ?? '',
+    status: item?.status ?? 'ACTIVE',
   });
+  const form = useForm<ItemForm>({ resolver: zodResolver(itemSchema), defaultValues: itemDefaults() });
+  // Every opening starts from the question being edited, or from a blank form for a new question
+  // (previously "Add question" reopened with the last question's text and mappings).
+  useEffect(() => {
+    if (!open) return;
+    form.reset(itemDefaults());
+    setMappings(initialMappings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
   const m = useMutation({
     mutationFn: async (v: ItemForm) => {
       const body = { ...v, defaultOwnerId: v.defaultOwnerId || null, description: v.description || null, guidance: v.guidance || null, internalPolicyRef: v.internalPolicyRef || null, riskRef: v.riskRef || null, evidenceRequirement: v.evidenceRequirement || null, category: v.category || null };
@@ -154,6 +159,12 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
     },
     onSuccess: () => {
       toast.success(item ? 'Question saved' : 'Question added');
+      qc.invalidateQueries({ queryKey: ['version', versionId] });
+      onOpenChange(false);
+    },
+    onError: (e) => {
+      // Someone submitted or published this version while the dialog was open: refresh so the page shows the lock.
+      toast.error(`${errorMessage(e)} The page has been refreshed to show the current state.`);
       qc.invalidateQueries({ queryKey: ['version', versionId] });
       onOpenChange(false);
     },
@@ -250,19 +261,31 @@ function ItemDialog({ versionId, item, open, onOpenChange, refs, readOnly }: { v
   );
 }
 
-/** People who can usually approve checklists (ISMS owners, administrators), minus the author and submitter. */
-function ReviewerSelect({ value, onChange, exclude }: { value: string; onChange: (v: string) => void; exclude: string[] }) {
-  const q = useQuery({ queryKey: ['directory', 'ISMS_OWNER,SYSTEM_ADMIN'], queryFn: () => usersService.directory('ISMS_OWNER,SYSTEM_ADMIN') });
-  const people = (q.data ?? []).filter((u) => !exclude.includes(u.id));
+/**
+ * Everyone who can approve checklists (by permission, after personal restrictions), minus the author
+ * and you. When nobody qualifies, the message says how to fix it instead of showing an empty list.
+ */
+function ReviewerSelect({ versionId, value, onChange }: { versionId: string; value: string; onChange: (v: string) => void }) {
+  const { user } = useAuth();
+  const q = useQuery({ queryKey: ['eligible-reviewers', versionId], queryFn: () => checklistsService.eligibleReviewers(versionId) });
+  const people = q.data ?? [];
   return (
-    <NativeSelect id="v-reviewer" value={value} onChange={(e) => onChange(e.target.value)} disabled={q.isLoading}>
-      <option value="">{q.isLoading ? 'Loading…' : people.length ? 'Choose a reviewer' : 'No eligible reviewer'}</option>
-      {people.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.name} — {u.roles.map((r) => ROLE_LABEL[r.role.key] ?? r.role.key).join(', ')}
-        </option>
-      ))}
-    </NativeSelect>
+    <>
+      <NativeSelect id="v-reviewer" value={value} onChange={(e) => onChange(e.target.value)} disabled={q.isLoading || !people.length}>
+        <option value="">{q.isLoading ? 'Loading…' : people.length ? 'Choose a reviewer' : 'No eligible reviewer'}</option>
+        {people.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.name}
+            {u.id === user?.id ? ' (you)' : ''} — {u.roles.join(', ')}
+          </option>
+        ))}
+      </NativeSelect>
+      {!q.isLoading && !people.length && (
+        <p className="mt-2 rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+          Nobody other than the author can approve checklists in this organisation. An administrator can give someone the ISMS / Compliance Owner role (Users → Edit details &amp; roles), or add the checklist Approve permission to a role.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -296,7 +319,9 @@ export function ChecklistEditorPage() {
   const { id = '', versionId = '' } = useParams();
   const { can } = useAuth();
   const qc = useQueryClient();
-  const [filters, setFilters] = useState({ search: '', priority: '', clause: '', needsReview: '' });
+  // A link from global search opens the editor filtered to that question.
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState({ search: params.get('search') ?? '', priority: '', clause: '', needsReview: '' });
   const q = useQuery({ queryKey: ['version', versionId, filters], queryFn: () => checklistsService.version(versionId, filters) });
   const refs = useQuery({ queryKey: ['iso-refs'], queryFn: checklistsService.isoReferences, staleTime: Infinity });
   const [dlg, setDlg] = useState<{ open: boolean; item?: ChecklistItem }>({ open: false });
@@ -305,7 +330,6 @@ export function ChecklistEditorPage() {
   const [mappingIssues, setMappingIssues] = useState<{ questionCode: string; references: string[] }[] | null>(null);
   const [commentFor, setCommentFor] = useState<ChecklistItem | null | undefined>(undefined);
   const comments = useQuery({ queryKey: ['version-comments', versionId], queryFn: () => checklistsService.reviewComments(versionId), enabled: !!versionId });
-  const { user } = useAuth();
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['version', versionId] });
@@ -424,7 +448,7 @@ export function ChecklistEditorPage() {
                       {c.resolvedAt && ` · resolved by ${c.resolvedBy?.name ?? '—'}`}
                     </p>
                   </div>
-                  {!c.resolvedAt && ['DRAFT', 'UNDER_REVIEW'].includes(v.status) && (
+                  {c.canResolve && (
                     <Button size="sm" variant="ghost" loading={resolveComment.isPending && resolveComment.variables === c.id} onClick={() => resolveComment.mutate(c.id)}>
                       <CheckCircle2 /> Resolve
                     </Button>
@@ -565,7 +589,7 @@ export function ChecklistEditorPage() {
         open={confirm === 'submit-review'}
         onOpenChange={() => setConfirm(null)}
         title="Submit for review"
-        description="Editing is locked while the reviewer checks this version. The reviewer must be someone other than you or the author, with checklist approval rights."
+        description="Editing is locked while the reviewer checks this version. One reviewer is needed: anyone with checklist approval rights (an administrator or ISMS owner) except the author of this version. If you did not write it, you can name yourself."
         confirmLabel="Submit"
         onConfirm={async () => {
           if (!reviewerId) throw new Error('Choose a reviewer.');
@@ -575,7 +599,7 @@ export function ChecklistEditorPage() {
         }}
       >
         <Field label="Reviewer" required htmlFor="v-reviewer">
-          <ReviewerSelect value={reviewerId} onChange={setReviewerId} exclude={[user?.id, v.review.author?.id].filter((x): x is string => !!x)} />
+          <ReviewerSelect versionId={versionId} value={reviewerId} onChange={setReviewerId} />
         </Field>
       </ConfirmDialog>
       <ConfirmDialog

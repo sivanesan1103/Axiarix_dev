@@ -26,6 +26,17 @@ export const settingSchemas = {
     events: z.record(z.boolean()),
     deadlineReminderDays: z.number().int().min(0).max(60),
   }),
+  /** Dates and times are stored in UTC and shown in this IANA time zone (SRS 2.3, NFR-10). */
+  'locale.config': z.object({
+    timeZone: z.string().refine((tz) => {
+      try {
+        new Intl.DateTimeFormat('en-GB', { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Unknown time zone'),
+  }),
   'report.config': z.object({
     headerTitle: z.string().min(1).max(200),
     footerText: z.string().max(500),
@@ -57,6 +68,7 @@ export const settingDefaults: { [K in SettingKey]: SettingValue<K> } = {
     events: Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, true])),
     deadlineReminderDays: 3,
   },
+  'locale.config': { timeZone: 'Asia/Kolkata' },
   'report.config': {
     headerTitle: 'ISO/IEC 27001:2022 Internal Assessment Report',
     footerText:
@@ -77,9 +89,21 @@ export async function getSetting<K extends SettingKey>(key: K, organisationId?: 
   return (parsed.success ? parsed.data : settingDefaults[key]) as SettingValue<K>;
 }
 
+/** Short-lived cache for settings read on every request (e.g. the MFA policy). Cleared on save. */
+const settingCache = new Map<string, { at: number; value: unknown }>();
+export async function getSettingCached<K extends SettingKey>(key: K, organisationId: string, ttlMs = 30_000): Promise<SettingValue<K>> {
+  const k = orgKey(organisationId, key);
+  const hit = settingCache.get(k);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value as SettingValue<K>;
+  const value = await getSetting(key, organisationId);
+  settingCache.set(k, { at: Date.now(), value });
+  return value;
+}
+
 export async function setSetting<K extends SettingKey>(key: K, value: unknown, userId: string, organisationId: string) {
   const parsed = settingSchemas[key].parse(value) as Prisma.InputJsonValue;
   const k = orgKey(organisationId, key);
+  settingCache.delete(k);
   return prisma.systemSetting.upsert({
     where: { key: k },
     create: { key: k, value: parsed, updatedBy: userId },

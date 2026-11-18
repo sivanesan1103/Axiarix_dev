@@ -29,11 +29,13 @@ api   (backend/Dockerfile: Node.js, runs `prisma migrate deploy` then starts)  :
    ```
 3. Configure the API environment (see `.env.example`) through a secrets manager, not files:
    - `NODE_ENV=production`, `COOKIE_SECURE=true`, `FRONTEND_ORIGIN=https://<host>`
+   - `TRUST_PROXY` = number of reverse proxies in front of the API (load balancer + nginx = `2`). If it is too low, every user appears to come from the proxy's address and the whole hospital shares one rate limit
+   - `API_RATE_LIMIT` (default 600 requests per minute per client address) and `AUTH_RATE_LIMIT` (sign-in attempts per 15 minutes)
    - Strong random secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DOWNLOAD_TOKEN_SECRET` (≥32 characters), `MFA_ENCRYPTION_KEY` (exactly 32)
    - `DATABASE_URL` with TLS (`?sslmode=require`), `S3_*`, `MALWARE_SCANNER=clamav`, `CLAMAV_HOST`, `SMTP_*`
 4. Run `api` (applies migrations on start) and `web` (its nginx proxies `/api` to the `api` host on the internal network).
 5. Create the first administrator: in production, do **not** run the demo seed. Run only the reference/RBAC part once, then create the organisation and admin, e.g. with a one-off script based on `src/seed/seed-lib.ts` (`seedIsoReferences`, `seedRbac`) and a manually created admin user, or by using a staging seed and changing credentials before go-live.
-6. Enable **Security policy → Enforce MFA for privileged roles** and ask admins, ISMS owners and auditors to enrol.
+6. Set up MFA on your own administrator account, then enable **Security policy → Enforce MFA for privileged roles**. From then on admins, ISMS owners and auditors can only set up MFA until they have enrolled.
 7. Confirm and configure upload limits, retention, scoring and report branding in **Settings**.
 
 Startup without Docker: `cd backend && npm ci && npm run build && npx prisma migrate deploy && npm start`; `cd frontend && npm ci && npm run build`, then serve `dist/` with any static server that proxies `/api`.
@@ -44,6 +46,7 @@ Startup without Docker: `cd backend && npm ci && npm run build && npx prisma mig
 - **Logs:** one JSON line per request on stdout (request id, path, status, latency, user). Ship them to the hospital SIEM.
 - **Audit integrity:** run `GET /api/v1/audit-logs/verify` periodically and export the audit trail (CSV) to protected archival storage for stronger tamper resistance (NFR-SEC-06).
 - **Reminders:** deadline reminders run every 6 hours inside the API process, and on demand from Settings.
+- **Real-time updates:** browsers keep a long-lived connection to `/api/v1/events`. The bundled `nginx.conf` turns off buffering for it; any other proxy or load balancer must also allow long-lived, unbuffered responses (idle timeout ≥ 60 s; the API sends a keep-alive every 25 s). The live hub is in memory, so run one API instance, or add a shared channel before scaling out.
 
 ## Backup & restore (NFR-SEC-09, NFR-07)
 
@@ -65,6 +68,8 @@ For managed PostgreSQL, enable point-in-time recovery instead of relying on dump
 mc mirror --preserve prod/axiarix-private backup/axiarix-private-$(date +%F)
 ```
 Enable bucket versioning and object lock where available. Database rows reference objects by `storageKey` and `checksum`; after a restore, verify integrity by re-scanning a sample (`POST /evidence/versions/:id/rescan` also verifies the SHA-256 checksum).
+
+**Load test (before go-live):** from a machine inside the hospital network run `PASSWORD=… CONCURRENCY=<expected users> DURATION=60 API=https://<host>/api/v1 npm run test:load` with test accounts. It reports whether 95 % of requests finish within 3 seconds (NFR-01).
 
 **Restore test (quarterly):** restore the database and bucket into a staging environment, start the API, sign in, open three evidence files and one report, and run `GET /audit-logs/verify`. Record the result in the ISMS records.
 

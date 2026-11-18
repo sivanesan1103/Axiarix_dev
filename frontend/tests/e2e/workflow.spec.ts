@@ -41,8 +41,9 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await isms.waitForTimeout(800);
   await shot(isms, '02-dashboard');
 
-  await isms.goto('/checklists');
-  await expect(isms.getByText('Kauvery Vadapalani IT – Internal Audit Checklist')).toBeVisible();
+  // Search rather than rely on the first page: every E2E run adds a checklist.
+  await isms.goto('/checklists?search=Kauvery%20Vadapalani');
+  await expect(isms.locator('tbody').getByText('Kauvery Vadapalani IT – Internal Audit Checklist')).toBeVisible();
   await shot(isms, '03-checklist-library');
   await isms.getByRole('button', { name: 'New checklist' }).click();
   await isms.locator('#c-title').fill(CHECKLIST);
@@ -106,7 +107,7 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await it.getByRole('button', { name: 'Submit for audit' }).click();
   await expect(dialog(it).getByText('All mandatory answers')).toBeVisible();
   await dialog(it).getByRole('button', { name: 'Submit' }).click();
-  await expect(it.getByText('Submitted for audit').first()).toBeVisible();
+  await expect(it.locator('h1')).toContainText('Submitted for audit'); // the status badge, not the progress-bar label
   // Submitted assessments are read-only for the department.
   await expect(it.getByText(/read-only/).first()).toBeVisible();
 
@@ -117,9 +118,13 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await shot(auditor, '07-auditor-workspace');
   await auditor.goto(`/auditor/${assessmentId}`);
   await auditor.getByRole('button', { name: 'Start review' }).click();
-  await expect(auditor.getByText('Under review').first()).toBeVisible();
+  await expect(auditor.locator('h1')).toContainText('Under review'); // the status badge, not the progress-bar label
   await auditor.getByRole('button', { name: 'Accept', exact: true }).click();
   await expect(auditor.getByText('Accepted').first()).toBeVisible();
+  // Accepting the file is separate from accepting the answer; both are needed before the review can be submitted.
+  await auditor.getByRole('button', { name: /^Accept answer/ }).click();
+  await expect(auditor.getByRole('button', { name: 'Answer accepted' })).toBeDisabled();
+  await expect(auditor.getByText(/Reviewed 1 of 1/)).toBeVisible();
   await auditor.getByRole('button', { name: 'Raise finding' }).click();
   await dialog(auditor).locator('#f-sev').selectOption('MEDIUM');
   await dialog(auditor).locator('#f-title').fill(`File-server restore not yet in DR plan ${stamp}`);
@@ -129,11 +134,11 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await auditor.getByRole('button', { name: 'Submit review' }).click();
   await dialog(auditor).locator('#opinion').fill('Backup control operating effectively; one observation raised for DR plan coverage.');
   await dialog(auditor).getByRole('button', { name: 'Submit review' }).click();
-  await expect(auditor.getByText('Pending approval').first()).toBeVisible();
+  await expect(auditor.locator('h1')).toContainText('Pending approval'); // the status badge, not the progress-bar label
 
   // ── IT owner: corrective action with closure evidence ──
-  await it.goto('/findings');
-  await it.getByText(`File-server restore not yet in DR plan ${stamp}`).click();
+  await it.goto(`/findings?search=${stamp}`);
+  await it.locator('tbody').getByText(`File-server restore not yet in DR plan ${stamp}`).click();
   await it.getByRole('button', { name: 'Plan corrective action' }).click();
   await dialog(it).locator('#ca-rc').fill('DR plan template omitted file shares');
   await dialog(it).locator('#ca-ca').fill('Add file-server restore steps to the DR plan and include in quarterly drill');
@@ -175,11 +180,12 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
   await isms.goto(new URL(assessmentUrl).pathname);
   await isms.getByRole('button', { name: 'Approve & issue report' }).click();
   await dialog(isms).getByRole('button', { name: 'Approve' }).click();
-  await expect(isms.getByText('Approved / closed').first()).toBeVisible();
+  // Wait for the server's confirmation; "Approved / closed" alone also matches the progress-bar label.
+  await expect(isms.getByText('Approved — final report generated')).toBeVisible();
   await isms.goto('/evidence');
   await expect(isms.getByText('restore-drill-q3.pdf').first()).toBeVisible();
   await shot(isms, '06-evidence-repository');
-  await isms.goto('/reports');
+  await isms.goto(`/reports?search=${encodeURIComponent(stamp)}`);
   const row = isms.getByRole('row', { name: new RegExp(ASSESSMENT) });
   await expect(row).toBeVisible();
   await shot(isms, '10-reports');
@@ -199,8 +205,10 @@ test('complete ISO 27001 audit workflow', async ({ browser }) => {
 
 test('cross-branch user cannot open another branch assessment (AT-10 in the UI)', async ({ browser }) => {
   const isms = await loginAs(browser, 'isms@axiarix.local');
-  await isms.goto('/assessments');
-  await isms.getByText('ASM-2026-0001').click();
+  // Search rather than rely on the first page: E2E runs keep adding assessments.
+  await isms.goto('/assessments?search=ASM-2026-0001');
+  await isms.locator('tbody').getByText('ASM-2026-0001').click();
+  await expect(isms).toHaveURL(/\/assessments\/[0-9a-f-]{36}$/);
   const id = isms.url().split('/').pop()!;
   const other = await loginAs(browser, 'itowner.alwarpet@axiarix.local');
   await other.goto(`/my-assessments/${id}`);

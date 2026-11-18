@@ -202,6 +202,18 @@ describe.sequential('ISO 27001 assessment workflow', () => {
     const notes = await prisma.notification.findMany({ where: { type: 'EVIDENCE_REJECTED', userId: { in: [base.users['contributor@axiarix.local'], base.users['itowner@axiarix.local']] } } });
     expect(notes.length).toBeGreaterThan(0);
 
+    // The review cannot be submitted while answered questions or evidence still lack a decision.
+    const early = await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Current-period threat intelligence evidence required.' });
+    expect(early.status).toBe(422);
+    expect(early.body.error.details.pendingReview.map((p: { itemId: string }) => p.itemId).sort()).toEqual([state.item2, state.item3].sort());
+    const ev2 = await prisma.evidence.findFirstOrThrow({ where: { assessmentId: id, itemId: state.item2, deletedAt: null } });
+    expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item2}/review`, { decision: 'ACCEPTED', evidenceId: ev2.id })).status).toBe(201);
+    expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item3}/review`, { decision: 'ACCEPTED', comments: 'SoA exclusion confirmed' })).status).toBe(201);
+    // Accepting a file is not a decision on the answer: question 2 still waits for one.
+    const still = await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Current-period threat intelligence evidence required.' });
+    expect(still.status).toBe(422);
+    expect(still.body.error.details.pendingReview.map((p: { itemId: string }) => p.itemId)).toEqual([state.item2]);
+    expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item2}/review`, { decision: 'ACCEPTED' })).status).toBe(201);
     const sub = await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Current-period threat intelligence evidence required.' });
     expect(sub.body.data.status).toBe('CLARIFICATION_REQUIRED');
     // Only the flagged question is editable during clarification.
@@ -213,6 +225,8 @@ describe.sequential('ISO 27001 assessment workflow', () => {
     expect((await itOwner.post(`/api/v1/assessments/${id}/submit`)).body.data.status).toBe('SUBMITTED_FOR_AUDIT');
     await auditor.post(`/api/v1/assessments/${id}/start-review`);
     expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item1}/review`, { decision: 'ACCEPTED', evidenceId: state.evidence1 })).status).toBe(201);
+    // Round 2: the new file is accepted, and so is the answer it supports.
+    expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item1}/review`, { decision: 'ACCEPTED' })).status).toBe(201);
   });
 
   it('AT-07: auditor raises a finding and a corrective action is assigned; it shows on the dashboard', async () => {
@@ -242,6 +256,27 @@ describe.sequential('ISO 27001 assessment workflow', () => {
     const dash = await mgmt.get('/api/v1/dashboard/summary');
     expect(dash.body.data.kpis.openFindings).toBe(1);
     expect(dash.body.data.findingsBySeverity.find((s: { severity: string }) => s.severity === 'HIGH').count).toBe(1);
+
+    // A contributor who owns a finding can plan its corrective action (the auditor still verifies it).
+    const own = await auditor.post('/api/v1/findings', {
+      assessmentId: id, itemId: state.item2, category: 'OBSERVATION', severity: 'LOW',
+      title: 'Restore log not signed', description: 'The restore log has no reviewer signature.',
+      ownerId: base.users['contributor@axiarix.local'], dueDate: '2026-12-31',
+    });
+    expect(own.status).toBe(201);
+    const planned = await contributor.post(`/api/v1/findings/${own.body.data.id}/actions`, {
+      correctiveAction: 'Add a reviewer signature line to the restore log', ownerId: base.users['contributor@axiarix.local'], targetDate: '2026-12-20',
+    });
+    expect(planned.status).toBe(201);
+    // Not the owner: refused.
+    const other = await auditor.post('/api/v1/findings', {
+      assessmentId: id, category: 'OBSERVATION', severity: 'LOW', title: 'Owner check', description: 'Owned by the IT owner.',
+      ownerId: base.users['itowner@axiarix.local'], dueDate: '2026-12-31',
+    });
+    expect((await contributor.post(`/api/v1/findings/${other.body.data.id}/actions`, { correctiveAction: 'Not mine', ownerId: base.users['contributor@axiarix.local'], targetDate: '2026-12-20' })).status).toBe(403);
+    // Remove these two so the later counts are unchanged.
+    await prisma.correctiveAction.deleteMany({ where: { findingId: { in: [own.body.data.id, other.body.data.id] } } });
+    await prisma.finding.deleteMany({ where: { id: { in: [own.body.data.id, other.body.data.id] } } });
   });
 
   it('AT-08: closure evidence is submitted and the finding closes only after authorised verification', async () => {
@@ -261,13 +296,9 @@ describe.sequential('ISO 27001 assessment workflow', () => {
 
   it('AT-09: approver approves and the final PDF is generated and stored centrally', async () => {
     const id = state.assessmentId;
-    // With N/A acceptance enforced, the review cannot be submitted until the N/A answer is accepted.
+    // N/A acceptance is enforced; the N/A answer (item 3) was explicitly accepted during the review.
     const wf = await admin.get('/api/v1/admin/settings');
     expect((await admin.put('/api/v1/admin/settings/workflow.policy', { ...wf.body.data['workflow.policy'], requireAuditorAcceptanceForNA: true })).status).toBe(200);
-    const blocked = await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Controls operating; one minor NC closed.' });
-    expect(blocked.status).toBe(422);
-    expect(blocked.body.error.details.pendingNA.map((p: { itemId: string }) => p.itemId)).toEqual([state.item3]);
-    expect((await auditor.post(`/api/v1/assessments/${id}/items/${state.item3}/review`, { decision: 'ACCEPTED', comments: 'SoA exclusion confirmed' })).status).toBe(201);
     const rev = await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Controls operating; one minor NC closed.' });
     expect(rev.body.data.status).toBe('PENDING_APPROVAL');
     // The final report cannot be generated before approval.

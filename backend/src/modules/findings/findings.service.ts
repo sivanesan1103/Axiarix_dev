@@ -4,10 +4,10 @@ import { assertSod, sodError } from '../../services/sod.service.js';
 import { prisma, type Tx } from '../../config/prisma.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { notify } from '../../services/notification.service.js';
-import { assertUnitAccess } from '../../services/scope.service.js';
+import { assertUnitAccess, assertUserCoversUnit } from '../../services/scope.service.js';
 import { nextCode } from '../../services/settings.service.js';
 import { recordTransition } from '../../services/workflow.service.js';
-import { badRequest, forbidden, invalidState, notFound, validationError } from '../../utils/errors.js';
+import { forbidden, invalidState, notFound, validationError } from '../../utils/errors.js';
 import { loadAssessment, usersInUnit } from '../assessments/assessments.service.js';
 
 const RAISE_STATUSES = ['SUBMITTED_FOR_AUDIT', 'UNDER_REVIEW', 'CLARIFICATION_REQUIRED', 'REVIEWED', 'PENDING_APPROVAL'];
@@ -24,12 +24,6 @@ async function setFindingStatus(tx: Tx, req: Request, f: { id: string; status: F
   await tx.finding.update({ where: { id: f.id }, data: { status: to, ...extra } });
   await recordTransition(tx, 'Finding', f.id, f.status, to, req.user!.id, reason);
   await recordAudit({ req, action: `FINDING_${to}`, entityType: 'Finding', entityId: f.id, siteId: f.siteId, metadata: { from: f.status, to, reason: reason ?? null } }, tx);
-}
-
-async function assertOrgUser(organisationId: string, userId: string) {
-  const u = await prisma.user.findFirst({ where: { id: userId, organisationId, status: 'ACTIVE' } });
-  if (!u) throw badRequest('Selected owner not found or inactive');
-  return u;
 }
 
 export interface FindingInput {
@@ -53,7 +47,7 @@ export async function createFinding(req: Request, input: FindingInput) {
     const item = await prisma.checklistItem.findFirst({ where: { id: input.itemId, versionId: a.checklistVersionId } });
     if (!item) throw notFound('Question');
   }
-  if (input.ownerId) await assertOrgUser(a.organisationId, input.ownerId);
+  if (input.ownerId) await assertUserCoversUnit(a, input.ownerId, 'finding owner');
   const finding = await prisma.$transaction(async (tx) => {
     const code = await nextCode('FND', tx);
     const status: FindingStatus = input.ownerId ? 'ASSIGNED' : 'OPEN';
@@ -87,7 +81,7 @@ export async function updateFinding(req: Request, id: string, input: Partial<Omi
 export async function assignFinding(req: Request, id: string, ownerId: string, dueDate?: Date | null) {
   const f = await loadFinding(req, id);
   if (f.status === 'CLOSED') throw invalidState('Finding is closed');
-  await assertOrgUser(f.organisationId, ownerId);
+  await assertUserCoversUnit(f, ownerId, 'finding owner');
   await prisma.$transaction(async (tx) => {
     await tx.finding.update({ where: { id }, data: { ownerId, ...(dueDate ? { dueDate } : {}) } });
     if (f.status === 'OPEN') await setFindingStatus(tx, req, f, 'ASSIGNED');
@@ -110,7 +104,7 @@ export async function createAction(req: Request, findingId: string, input: Actio
   if (f.status === 'CLOSED') throw invalidState('Finding is closed');
   const u = req.user!;
   if (!u.permissions.has('corrective_action:create') && f.ownerId !== u.id) throw forbidden('Only the finding owner or IT owner can plan corrective actions');
-  await assertOrgUser(f.organisationId, input.ownerId);
+  await assertUserCoversUnit(f, input.ownerId, 'corrective action owner');
   const action = await prisma.$transaction(async (tx) => {
     const code = await nextCode('CA', tx);
     const ca = await tx.correctiveAction.create({ data: { ...input, code, findingId, createdById: u.id } });
@@ -138,7 +132,7 @@ function assertActionEditor(req: Request, ca: { ownerId: string; status: string 
 export async function updateAction(req: Request, id: string, input: Partial<ActionInput>) {
   const ca = await loadAction(req, id);
   assertActionEditor(req, ca);
-  if (input.ownerId) await assertOrgUser(ca.finding.organisationId, input.ownerId);
+  if (input.ownerId) await assertUserCoversUnit(ca.finding, input.ownerId, 'corrective action owner');
   const updated = await prisma.correctiveAction.update({ where: { id }, data: input });
   await recordAudit({ req, action: 'CORRECTIVE_ACTION_UPDATED', entityType: 'CorrectiveAction', entityId: id, siteId: ca.finding.siteId, metadata: { fields: Object.keys(input) } });
   return updated;

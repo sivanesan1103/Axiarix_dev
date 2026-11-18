@@ -172,9 +172,9 @@ function useSettings(enabled = true) {
   return useQuery({ queryKey: ['settings'], queryFn: adminService.settings, enabled });
 }
 
-function SaveSetting<K extends keyof Settings>({ k, value, disabled }: { k: K; value: Settings[K]; disabled?: boolean }) {
+function SaveSetting<K extends keyof Settings>({ k, value, disabled, onSaved }: { k: K; value: Settings[K]; disabled?: boolean; onSaved?: () => void }) {
   const qc = useQueryClient();
-  const m = useMutation({ mutationFn: () => adminService.saveSetting(k, value), onSuccess: () => (toast.success('Settings saved'), qc.invalidateQueries({ queryKey: ['settings'] })) });
+  const m = useMutation({ mutationFn: () => adminService.saveSetting(k, value), onSuccess: () => (toast.success('Settings saved'), qc.invalidateQueries({ queryKey: ['settings'] }), onSaved?.()) });
   return (
     <Button variant="primary" disabled={disabled} loading={m.isPending} onClick={() => m.mutate()}>
       Save
@@ -182,7 +182,45 @@ function SaveSetting<K extends keyof Settings>({ k, value, disabled }: { k: K; v
   );
 }
 
+/** Common zones first; the full IANA list follows where the browser provides it. */
+const COMMON_ZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'America/New_York', 'UTC'];
+function allZones(): string[] {
+  const intl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
+  const rest = intl.supportedValuesOf?.('timeZone') ?? [];
+  return [...COMMON_ZONES, ...rest.filter((z) => !COMMON_ZONES.includes(z))];
+}
+
+function RegionalCard({ s, canEdit }: { s: Settings; canEdit: boolean }) {
+  const { reload } = useAuth();
+  const [loc, setLoc] = useState(s['locale.config']);
+  const now = new Date();
+  let preview = '';
+  try {
+    preview = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: loc.timeZone }).format(now);
+  } catch {
+    preview = '—';
+  }
+  return (
+    <Card>
+      <CardHeader title="Regional settings" description="Dates and times are stored in UTC and shown in this time zone on every screen and in final reports." actions={canEdit && <SaveSetting k="locale.config" value={loc} onSaved={() => void reload()} />} />
+      <CardBody className="space-y-2">
+        <Field label="Time zone" htmlFor="tz">
+          <NativeSelect id="tz" disabled={!canEdit} value={loc.timeZone} onChange={(e) => setLoc({ timeZone: e.target.value })}>
+            {allZones().map((z) => (
+              <option key={z} value={z}>
+                {z.replaceAll('_', ' ')}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <p className="text-[13px] text-muted">Now in this zone: {preview}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
 function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
+  const { user } = useAuth();
   const [wf, setWf] = useState(s['workflow.policy']);
   const [up, setUp] = useState(s['upload.policy']);
   const [sec, setSec] = useState(s['security.policy']);
@@ -210,7 +248,13 @@ function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
       <Card>
         <CardHeader title="Security policy" actions={canEdit && <SaveSetting k="security.policy" value={sec} />} />
         <CardBody className="space-y-4">
-          {row('Enforce MFA for privileged roles', 'Administrators, ISMS owners and auditors are prompted to enrol at sign-in.', sec.enforceMfaForPrivileged, (c) => setSec({ ...sec, enforceMfaForPrivileged: c }))}
+          {row(
+            'Enforce MFA for privileged roles',
+            'Administrators, ISMS owners and auditors must set up two-step verification before they can use the system.',
+            sec.enforceMfaForPrivileged,
+            (c) => (c && !user?.mfaEnabled ? toast.error('Set up two-step verification on your own account first (Profile & security).') : setSec({ ...sec, enforceMfaForPrivileged: c })),
+          )}
+          {!user?.mfaEnabled && !sec.enforceMfaForPrivileged && <p className="text-xs text-muted">To switch this on, first set up two-step verification for your own account under Profile &amp; security, so you are not locked out.</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Failed sign-ins before lock-out">
               <Input type="number" min={3} max={20} disabled={!canEdit} value={sec.maxFailedLogins} onChange={(e) => setSec({ ...sec, maxFailedLogins: Number(e.target.value) })} />
@@ -232,6 +276,7 @@ function WorkflowTab({ s, canEdit }: { s: Settings; canEdit: boolean }) {
           </Field>
         </CardBody>
       </Card>
+      <RegionalCard s={s} canEdit={canEdit} />
     </div>
   );
 }

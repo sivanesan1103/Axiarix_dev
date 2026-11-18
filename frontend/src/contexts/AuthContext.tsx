@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { refreshAccessToken, tokenStore } from '@/api/client';
 import { authService } from '@/services/auth.service';
+import { setDisplayTimeZone } from '@/lib/utils';
 import type { RoleKey, SessionUser } from '@/types/api';
 
 interface AuthState {
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     const me = await authService.me();
+    setDisplayTimeZone(me.timeZone);
     setUser(me);
     setStatus('authenticated');
   }, []);
@@ -50,10 +52,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [reload, qc]);
 
+  // Roles, scope and restrictions can be changed by an administrator at any time. The server applies a
+  // change immediately; re-reading the profile every minute and when the tab regains focus keeps the
+  // menus and buttons in step, so nobody keeps seeing pages they lost or misses ones they gained.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    // /auth/me is not retried by the API client's 401 handler, so renew the access token here first
+    // when it has expired, then read the profile again.
+    const refresh = () => {
+      authService
+        .me()
+        .catch(async () => ((await refreshAccessToken()) ? authService.me() : Promise.reject(new Error('signed out'))))
+        .then((me) => {
+          setDisplayTimeZone(me.timeZone);
+          setUser(me);
+        })
+        .catch(() => undefined);
+    };
+    const t = setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    // The API client raises this when the server starts requiring MFA mid-session.
+    window.addEventListener('axiarix:mfa-required', refresh);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('axiarix:mfa-required', refresh);
+    };
+  }, [status]);
+
   const login = useCallback(async (email: string, password: string, mfaCode?: string) => {
     const r = await authService.login(email, password, mfaCode);
     if (r.mfaRequired || !r.user) return { mfaRequired: true };
-    setUser(r.user);
+    setDisplayTimeZone(r.user.timeZone);
+    setUser({ ...r.user, mfaEnrolmentRequired: r.mfaEnrolmentRequired ?? r.user.mfaEnrolmentRequired });
     setStatus('authenticated');
     return { mfaRequired: false, mfaEnrolmentRequired: r.mfaEnrolmentRequired };
   }, []);

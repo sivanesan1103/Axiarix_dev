@@ -58,8 +58,9 @@ export function NewAssessmentPage() {
   const departmentId = form.watch('departmentId');
   const site = org.data?.sites.find((s) => s.id === siteId);
   useEffect(() => {
+    // The owner follows the department: picking another department switches to its owner (or clears the choice).
     const dept = site?.departments.find((d) => d.id === departmentId);
-    if (dept?.ownerId && !form.getValues('ownerId')) form.setValue('ownerId', dept.ownerId);
+    form.setValue('ownerId', dept?.ownerId ?? '');
   }, [departmentId, site, form]);
   const m = useMutation({
     mutationFn: (v: Form) => assessmentsService.create({ ...v, scope: v.scope || null }),
@@ -72,7 +73,7 @@ export function NewAssessmentPage() {
   return (
     <div>
       <PageHeader back={{ to: '/assessments', label: 'Assessment Periods' }} title="New assessment" description="The selected checklist version and the active scoring policy are pinned to this assessment." />
-      <form onSubmit={form.handleSubmit((v) => m.mutate(v))} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <form onSubmit={form.handleSubmit((v) => m.mutate(v))} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
         <Card>
           <CardHeader title="Scope" />
           <CardBody className="grid gap-4 sm:grid-cols-2">
@@ -114,7 +115,7 @@ export function NewAssessmentPage() {
               </NativeSelect>
             </Field>
             <Field label="Assessment owner (IT Department Owner)" required className="sm:col-span-2" error={err.ownerId?.message} htmlFor="a-owner">
-              <UserSelect id="a-owner" value={form.watch('ownerId')} onChange={(v) => form.setValue('ownerId', v, { shouldValidate: true })} roles={['IT_OWNER']} siteId={siteId || undefined} />
+              <UserSelect id="a-owner" value={form.watch('ownerId')} onChange={(v) => form.setValue('ownerId', v, { shouldValidate: true })} roles={['IT_OWNER']} siteId={siteId || undefined} departmentId={departmentId || undefined} placeholder={departmentId ? 'Select the department owner' : 'Choose a department first'} />
             </Field>
             <Field label="Scope statement" className="sm:col-span-2" hint="Printed on the final report." htmlFor="a-scope">
               <Textarea id="a-scope" {...form.register('scope')} />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, ChevronDown, ChevronRight, Crosshair, LogOut, Menu, Moon, PanelLeft, Search, Settings as SettingsIcon, Sun, X } from 'lucide-react';
@@ -12,6 +12,8 @@ import { Avatar } from '@/components/ui/display';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger, Tooltip, TooltipProvider } from '@/components/ui/overlays';
 import { cn, relativeTime } from '@/lib/utils';
 import { ROLE_LABEL } from '@/constants/status';
+import { useRealtime } from '@/hooks/useRealtime';
+import { MfaEnrolmentGate } from './MfaEnrolmentGate';
 import { GROUP_LABEL, NAV, SEGMENT_LABEL, type NavItem } from './nav';
 
 const SIDEBAR_KEY = 'axiarix.sidebar.expanded';
@@ -37,9 +39,9 @@ function Logo({ expanded }: { expanded: boolean }) {
 }
 
 function Sidebar({ expanded, mobileOpen, onClose }: { expanded: boolean; mobileOpen: boolean; onClose: () => void }) {
-  const { can } = useAuth();
+  const { can, hasRole } = useAuth();
   const wide = expanded || mobileOpen;
-  const items = NAV.filter((n) => n.any.length === 0 || can(...n.any));
+  const items = NAV.filter((n) => (n.any.length === 0 || can(...n.any)) && (!n.roles || hasRole(...(n.roles as Parameters<typeof hasRole>))));
   const groups = (['platform', 'programme', 'audit', 'admin'] as const).map((g) => ({ g, items: items.filter((i) => i.group === g) })).filter((x) => x.items.length);
   const bottom = items.filter((i) => i.group === 'account');
   const renderItem = (n: NavItem) => {
@@ -431,7 +433,7 @@ function ProfileMenu() {
 }
 
 export function AppLayout() {
-  const { user } = useAuth();
+  const { user, reload } = useAuth();
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1';
@@ -452,12 +454,17 @@ export function AppLayout() {
       }),
     [],
   );
-  const inOrg = !user?.isPlatformOwner;
+  // While MFA enrolment is required the server refuses everything else, so only the gate is shown.
+  const gated = !!user?.mfaEnrolmentRequired;
+  const inOrg = !user?.isPlatformOwner && !gated;
+  // Live updates: other people's changes appear without reloading the page.
+  const reloadProfile = useCallback(() => void reload().catch(() => undefined), [reload]);
+  const live = useRealtime(!!user && !gated, reloadProfile, user?.id);
   return (
     <TooltipProvider>
       {inOrg && <ScopeUrlSync />}
       <div className="flex min-h-screen bg-surface">
-        <Sidebar expanded={expanded} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+        {!gated && <Sidebar expanded={expanded} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />}
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex h-[68px] items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:px-8">
             <button className="rounded-lg p-2 hover:bg-muted-bg md:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
@@ -474,7 +481,15 @@ export function AppLayout() {
             {inOrg && <GlobalSearch />}
             <div className="ml-auto flex items-center gap-1.5">
               {inOrg && <ScopeButton />}
-              <Notifications />
+              {!gated && (
+                <Tooltip content={live ? 'Live: changes by others appear automatically' : 'Reconnecting live updates…'}>
+                  <span className="hidden items-center gap-1.5 rounded-full px-2 py-1 text-xs text-muted sm:inline-flex" aria-live="polite">
+                    <span className={cn('size-2 rounded-full', live ? 'bg-ok' : 'bg-warn animate-pulse')} />
+                    {live ? 'Live' : 'Offline'}
+                  </span>
+                </Tooltip>
+              )}
+              {!gated && <Notifications />}
               <ThemeToggle />
               <div className="mx-1.5 hidden h-7 w-px bg-line sm:block" />
               <ProfileMenu />
@@ -482,7 +497,7 @@ export function AppLayout() {
           </header>
           <main className="flex-1 px-4 py-7 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-[1600px]">
-              <Outlet />
+              {gated ? <MfaEnrolmentGate /> : <Outlet />}
             </div>
           </main>
         </div>

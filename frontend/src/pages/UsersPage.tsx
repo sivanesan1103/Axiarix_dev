@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { passwordSchema } from '@/schemas/common';
 import { Ban, MoreHorizontal, Plus, ShieldCheck, Trash2, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 import { usersService, type RoleAssignment } from '@/services/users.service';
@@ -18,13 +19,21 @@ import { formatDateTime } from '@/lib/utils';
 import type { UserRow } from '@/types/api';
 
 const roleSchema = z.object({ roleKey: z.string().min(1, 'Choose a role'), siteId: z.string().optional(), departmentId: z.string().optional() });
-const userSchema = z.object({
-  name: z.string().trim().min(2, 'Name is required'),
-  email: z.string().trim().email('Valid e-mail required'),
-  designation: z.string().trim().max(120).optional(),
-  sendInvite: z.boolean(),
-  roles: z.array(roleSchema).min(1, 'Assign at least one role'),
-});
+const userSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Name is required'),
+    email: z.string().trim().email('Valid e-mail required'),
+    designation: z.string().trim().max(120).optional(),
+    sendInvite: z.boolean(),
+    // Only when no invitation is e-mailed: the administrator gives a starting password instead.
+    password: z.string().optional(),
+    roles: z.array(roleSchema).min(1, 'Assign at least one role'),
+  })
+  .superRefine((v, ctx) => {
+    if (v.sendInvite) return;
+    const r = passwordSchema.safeParse(v.password ?? '');
+    if (!r.success) ctx.addIssue({ code: 'custom', path: ['password'], message: r.error.issues[0]?.message ?? 'Enter a starting password' });
+  });
 type UserForm = z.infer<typeof userSchema>;
 
 const toAssignments = (roles: UserForm['roles']): RoleAssignment[] => roles.map((r) => ({ roleKey: r.roleKey, siteId: r.siteId || null, departmentId: r.departmentId || null }));
@@ -79,26 +88,30 @@ function RoleRows({ form }: { form: ReturnType<typeof useForm<UserForm>> }) {
 
 function UserDialog({ user, open, onOpenChange }: { user?: UserRow; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
-  const form = useForm<UserForm>({
-    resolver: zodResolver(userSchema),
-    values: {
-      name: user?.name ?? '',
-      email: user?.email ?? '',
-      designation: user?.designation ?? '',
-      sendInvite: true,
-      roles: user?.roles.map((r) => ({ roleKey: r.role.key, siteId: r.siteId ?? '', departmentId: r.departmentId ?? '' })) ?? [{ roleKey: '', siteId: '', departmentId: '' }],
-    },
+  const defaults = (): UserForm => ({
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    designation: user?.designation ?? '',
+    sendInvite: true,
+    password: '',
+    roles: user?.roles.map((r) => ({ roleKey: r.role.key, siteId: r.siteId ?? '', departmentId: r.departmentId ?? '' })) ?? [{ roleKey: '', siteId: '', departmentId: '' }],
   });
+  const form = useForm<UserForm>({ resolver: zodResolver(userSchema), defaultValues: defaults() });
+  // Start from a clean form every time the dialog opens (previously the last person's details stayed in it).
+  useEffect(() => {
+    if (open) form.reset(defaults());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user]);
   const m = useMutation({
     mutationFn: async (v: UserForm) => {
       if (user) {
         await usersService.update(user.id, { name: v.name, designation: v.designation || null });
         return usersService.setRoles(user.id, toAssignments(v.roles));
       }
-      return usersService.create({ name: v.name, email: v.email, designation: v.designation || null, sendInvite: v.sendInvite, roles: toAssignments(v.roles) });
+      return usersService.create({ name: v.name, email: v.email, designation: v.designation || null, sendInvite: v.sendInvite, password: v.sendInvite ? undefined : v.password, roles: toAssignments(v.roles) });
     },
-    onSuccess: () => {
-      toast.success(user ? 'User updated' : 'User created — an invitation e-mail was sent');
+    onSuccess: (_r, v) => {
+      toast.success(user ? 'User updated' : v.sendInvite ? 'User created — an invitation e-mail was sent' : 'User created with the starting password you gave');
       qc.invalidateQueries({ queryKey: ['users'] });
       onOpenChange(false);
     },
@@ -126,6 +139,11 @@ function UserDialog({ user, open, onOpenChange }: { user?: UserRow; open: boolea
                     E-mail a set-password link
                   </label>
                 </div>
+              )}
+              {!user && !form.watch('sendInvite') && (
+                <Field label="Starting password" required hint="Give it to the person privately; they can change it in Settings." error={form.formState.errors.password?.message} htmlFor="u-pw" className="sm:col-span-2">
+                  <Input id="u-pw" type="password" autoComplete="new-password" {...form.register('password')} />
+                </Field>
               )}
             </div>
             <div>
@@ -334,9 +352,18 @@ function UsersTab() {
                   <TD>{u.mfaEnabled ? <Badge tone="ok">Enabled</Badge> : <Badge>Off</Badge>}</TD>
                   <TD className="text-[13px] text-muted">{formatDateTime(u.lastLoginAt)}</TD>
                   <TD>
-                    <Badge tone={u.status === 'ACTIVE' ? 'ok' : 'neutral'} dot>
-                      {u.status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                    </Badge>
+                    {/* An active account that has never signed in is still waiting on its invitation. */}
+                    {u.status !== 'ACTIVE' ? (
+                      <Badge dot>Inactive</Badge>
+                    ) : u.lastLoginAt ? (
+                      <Badge tone="ok" dot>
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge tone="warn" dot>
+                        Invited
+                      </Badge>
+                    )}
                   </TD>
                   <TD>
                     {(can('user:update') || can('role:assign')) && u.canManage && (
@@ -417,7 +444,7 @@ function RolesTab() {
   if (roles.isLoading || perms.isLoading) return <Card><LoadingRows /></Card>;
   if (roles.isError) return <ErrorState error={roles.error} onRetry={() => roles.refetch()} />;
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)] [&>*]:min-w-0">
       <Card className="p-2">
         {roles.data!.map((r) => (
           <button key={r.id} onClick={() => setRoleId(r.id)} className={`w-full rounded-md px-3 py-2.5 text-left ${role?.id === r.id ? 'bg-brand-soft' : 'hover:bg-subtle'}`}>

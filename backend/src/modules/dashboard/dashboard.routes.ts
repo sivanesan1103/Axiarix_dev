@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { assessmentParticipants, sodBlockReason } from '../../services/sod.service.js';
 import { z } from 'zod';
 import type { AssessmentStatus, Prisma, ResponseStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
@@ -36,6 +37,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     include: {
       scoringPolicy: true,
       site: { select: { id: true, name: true } },
+      department: { select: { id: true, name: true } },
       checklistVersion: { include: { items: { where: { status: 'ACTIVE' }, include: { mappings: true } } } },
       responses: { select: { itemId: true, status: true } },
       evidence: { where: { deletedAt: null, itemId: { not: null } }, select: { itemId: true, verificationStatus: true, deletedAt: true, versions: { orderBy: { version: 'desc' }, take: 1, select: { scanStatus: true } } } },
@@ -56,6 +58,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
   const themeAgg = new Map<string, StatusCounts>();
   const controlAgg = new Map<string, StatusCounts>();
   const siteAgg = new Map<string, { name: string; earned: number; denominator: number; assessments: number; counts: StatusCounts }>();
+  const deptAgg = new Map<string, { name: string; site: string; siteId: string; earned: number; denominator: number; assessments: number }>();
   const periodAgg = new Map<string, { start: Date; earned: number; denominator: number; assessments: number }>();
   const add = (m: Map<string, StatusCounts>, k: string, s: ResponseStatus) => {
     const c = m.get(k) ?? emptyCounts();
@@ -90,6 +93,11 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     site.assessments++;
     (Object.keys(counts) as ResponseStatus[]).forEach((k) => (site.counts[k] += counts[k]));
     siteAgg.set(a.siteId, site);
+    const dept = deptAgg.get(a.departmentId) ?? { name: a.department.name, site: a.site.name, siteId: a.siteId, earned: 0, denominator: 0, assessments: 0 };
+    dept.earned += s.earned;
+    dept.denominator += s.denominator;
+    dept.assessments++;
+    deptAgg.set(a.departmentId, dept);
     const p = periodAgg.get(a.periodLabel) ?? { start: a.periodStart, earned: 0, denominator: 0, assessments: 0 };
     p.earned += s.earned;
     p.denominator += s.denominator;
@@ -154,6 +162,7 @@ dashboardRouter.get('/summary', requirePermission('dashboard:read'), validate(fi
     findingsBySeverity: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'OBSERVATION'].map((s) => ({ severity: s, count: findingsBySeverity.find((x) => x.severity === s)?._count ?? 0 })),
     findingsByStatus: findingsByStatus.map((x) => ({ status: x.status, count: x._count })),
     actionProgress: ['PLANNED', 'IN_PROGRESS', 'RETURNED', 'SUBMITTED_FOR_VERIFICATION', 'VERIFIED'].map((s) => ({ status: s, count: actionStatus.find((x) => x.status === s)?._count ?? 0 })),
+    departmentComparison: [...deptAgg.entries()].map(([id, d]) => ({ departmentId: id, department: d.name, siteId: d.siteId, site: d.site, assessments: d.assessments, compliancePercent: pctOf(d.earned, d.denominator) })),
     branchComparison: [...siteAgg.entries()].map(([id, s]) => ({ siteId: id, site: s.name, assessments: s.assessments, compliancePercent: pctOf(s.earned, s.denominator), counts: s.counts })),
     trend: [...periodAgg.entries()].sort((a, b) => a[1].start.getTime() - b[1].start.getTime()).map(([period, p]) => ({ period, assessments: p.assessments, compliancePercent: pctOf(p.earned, p.denominator) })),
     recentActivity,
@@ -165,28 +174,50 @@ dashboardRouter.get('/tasks', async (req, res) => {
   const user = req.user!;
   const scope = unitWhere(user);
   const today = startOfToday();
-  const [assignments, toSubmit, toReview, toApprove, myActions, toVerify] = await Promise.all([
+  const p = (k: string) => user.permissions.has(k as never);
+  const pick = { id: true, code: true, title: true, status: true, dueDate: true } as const;
+  const [assignments, myQuestions, toRelease, toSubmit, toReview, toApprove, myFindings, myActions, toVerify, checklistReviews] = await Promise.all([
     prisma.assessmentAssignment.count({ where: { assigneeId: user.id, assessment: { status: { in: ['ASSIGNED', 'IN_PROGRESS', 'CLARIFICATION_REQUIRED'] } } } }),
-    user.permissions.has('assessment:submit')
-      ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['IN_PROGRESS', 'CLARIFICATION_REQUIRED', 'ASSIGNED'] } }, select: { id: true, code: true, title: true, status: true, dueDate: true }, take: 5, orderBy: { dueDate: 'asc' } })
+    // Assessments where this person has questions to answer, with how many are still unanswered.
+    prisma.assessment.findMany({
+      where: { status: { in: ['ASSIGNED', 'IN_PROGRESS', 'CLARIFICATION_REQUIRED'] }, assignments: { some: { assigneeId: user.id } } },
+      select: { ...pick, _count: { select: { assignments: { where: { assigneeId: user.id } } } } },
+      take: 5,
+      orderBy: { dueDate: 'asc' },
+    }),
+    p('assessment:update') ? prisma.assessment.findMany({ where: { ...scope, status: 'DRAFT' }, select: pick, take: 5, orderBy: { createdAt: 'desc' } }) : [],
+    p('assessment:submit')
+      ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['IN_PROGRESS', 'CLARIFICATION_REQUIRED', 'ASSIGNED'] }, ...(user.roles.includes('IT_OWNER') ? {} : { ownerId: user.id }) }, select: pick, take: 5, orderBy: { dueDate: 'asc' } })
       : [],
-    user.permissions.has('assessment:review')
-      ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['SUBMITTED_FOR_AUDIT', 'UNDER_REVIEW'] } }, select: { id: true, code: true, title: true, status: true, dueDate: true }, take: 5 })
-      : [],
-    user.permissions.has('assessment:approve')
-      ? prisma.assessment.findMany({ where: { ...scope, status: 'PENDING_APPROVAL' }, select: { id: true, code: true, title: true, status: true, dueDate: true }, take: 5 })
-      : [],
+    p('assessment:review') ? prisma.assessment.findMany({ where: { ...scope, status: { in: ['SUBMITTED_FOR_AUDIT', 'UNDER_REVIEW'] } }, select: { ...pick, ownerId: true }, take: 10 }) : [],
+    p('assessment:approve') ? prisma.assessment.findMany({ where: { ...scope, status: 'PENDING_APPROVAL' }, select: { ...pick, ownerId: true }, take: 10 }) : [],
+    prisma.finding.findMany({ where: { ownerId: user.id, status: { in: ['OPEN', 'ASSIGNED', 'ACTION_IN_PROGRESS'] } }, select: { id: true, code: true, title: true, status: true, severity: true, dueDate: true }, take: 5, orderBy: { dueDate: 'asc' } }),
     prisma.correctiveAction.findMany({ where: { ownerId: user.id, status: { in: ['PLANNED', 'IN_PROGRESS', 'RETURNED'] } }, select: { id: true, code: true, correctiveAction: true, targetDate: true, status: true }, take: 5, orderBy: { targetDate: 'asc' } }),
-    user.permissions.has('corrective_action:review')
-      ? prisma.correctiveAction.findMany({ where: { finding: scope, status: 'SUBMITTED_FOR_VERIFICATION' }, select: { id: true, code: true, correctiveAction: true, targetDate: true, status: true }, take: 5 })
+    p('corrective_action:review')
+      ? prisma.correctiveAction.findMany({ where: { finding: scope, status: 'SUBMITTED_FOR_VERIFICATION', ownerId: { not: user.id } }, select: { id: true, code: true, correctiveAction: true, targetDate: true, status: true }, take: 5 })
       : [],
+    prisma.checklistVersion.findMany({
+      where: { reviewerId: user.id, status: 'UNDER_REVIEW', template: { organisationId: user.organisationId } },
+      select: { id: true, versionNumber: true, submittedAt: true, template: { select: { id: true, title: true } } },
+      take: 5,
+    }),
   ]);
+  // Separation of duties: leave out reviews and approvals this person is not allowed to do.
+  const allowed = async (rows: Array<{ id: string; ownerId: string }>, stage: 'audit' | 'approve') => {
+    const out = [];
+    for (const r of rows) if (!sodBlockReason(user.id, await assessmentParticipants(r), stage)) out.push(r);
+    return out.slice(0, 5);
+  };
   ok(res, {
     openAssignments: assignments,
+    myQuestions: myQuestions.map((a) => ({ ...a, assignedToMe: a._count.assignments, overdue: a.dueDate < today })),
+    toRelease,
     toSubmit,
-    toReview,
-    toApprove,
+    toReview: await allowed(toReview, 'audit'),
+    toApprove: await allowed(toApprove, 'approve'),
+    myFindings: myFindings.map((f) => ({ ...f, overdue: f.dueDate < today })),
     myActions: myActions.map((a) => ({ ...a, overdue: a.targetDate < today })),
     toVerify,
+    checklistReviews,
   });
 });

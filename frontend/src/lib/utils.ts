@@ -5,11 +5,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-const dateTimeFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+// Dates are stored in UTC and shown in the organisation's time zone (Settings → Regional settings; SRS 2.3, NFR-10).
+// Until the profile has loaded, the browser's own time zone is used.
+let displayTimeZone: string | undefined;
+let dateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+let dateTimeFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const utcDateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** Dates are stored in UTC and displayed in the browser's local time zone (SRS NFR-10). */
-export const formatDate = (v?: string | Date | null) => (v ? dateFmt.format(new Date(v)) : '—');
+export function setDisplayTimeZone(timeZone?: string | null) {
+  if (!timeZone || timeZone === displayTimeZone) return;
+  try {
+    dateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone });
+    dateTimeFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone });
+    displayTimeZone = timeZone;
+  } catch {
+    /* unknown zone: keep the current formatters */
+  }
+}
+export const getDisplayTimeZone = () => displayTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/** Calendar dates (due dates, period bounds) are stored as midnight UTC and are shown as that same day everywhere. */
+const isCalendarDate = (d: Date) => d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+export const formatDate = (v?: string | Date | null) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return (isCalendarDate(d) ? utcDateFmt : dateFmt).format(d);
+};
 export const formatDateTime = (v?: string | Date | null) => (v ? dateTimeFmt.format(new Date(v)) : '—');
 export const toInputDate = (v?: string | Date | null) => (v ? new Date(v).toISOString().slice(0, 10) : '');
 

@@ -27,6 +27,8 @@ export interface AuthUser {
   mfaEnabled: boolean;
   isPlatformOwner: boolean;
   restrictions: ActiveRestriction[];
+  /** True while the security policy requires MFA for this (privileged) user and they have not enrolled. */
+  mfaEnrolmentRequired?: boolean;
 }
 
 declare module 'express-serve-static-core' {

@@ -136,7 +136,7 @@ export class ReportPdf {
       this.doc.page.margins.bottom = 0;
       this.doc.moveTo(this.margin, bottom - 8).lineTo(this.margin + this.width, bottom - 8).lineWidth(0.5).strokeColor(COLORS.line).stroke();
       this.doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted);
-      this.doc.text(pdfText(`${reportCode} v${version} | Generated ${generatedAt} UTC`), this.margin, bottom, { width: this.width / 2, lineBreak: false });
+      this.doc.text(pdfText(`${reportCode} v${version} | Generated ${generatedAt}`), this.margin, bottom, { width: this.width / 2, lineBreak: false });
       this.doc.text(`Page ${i + 1} of ${range.count}`, this.margin + this.width / 2, bottom, { width: this.width / 2, align: 'right', lineBreak: false });
       this.doc.text(pdfText(this.footer), this.margin, bottom + 10, { width: this.width, lineBreak: false, ellipsis: true });
       this.doc.page.margins.bottom = prevBottom;

@@ -1,3 +1,4 @@
+import { publishToUser } from './realtime.service.js';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { env, isTest } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
@@ -53,6 +54,7 @@ export async function notify(input: NotifyInput): Promise<void> {
           emailStatus: emailOn ? 'PENDING' : 'SKIPPED',
         },
       });
+      publishToUser(user.id, { type: 'notification' });
       if (!emailOn) continue;
       void deliver(n.id, user.email, input);
     }

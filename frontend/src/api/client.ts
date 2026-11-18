@@ -58,7 +58,8 @@ export function refreshAccessToken(): Promise<string | null> {
         return accessToken;
       } catch (e) {
         const status = axios.isAxiosError(e) ? e.response?.status : undefined;
-        const transient = status === undefined || status >= 500;
+        // 429 (rate limited) is temporary too: retry instead of signing the user out.
+        const transient = status === undefined || status >= 500 || status === 429;
         if (!transient || attempt >= RETRY_DELAYS_MS.length) {
           accessToken = null;
           return null;
@@ -88,6 +89,8 @@ api.interceptors.response.use(
         onSessionExpired?.();
       }
     }
+    // The server now requires MFA set-up for this account: let the app re-read the profile and show the set-up screen.
+    if (error.response?.status === 403 && code === 'MFA_ENROLMENT_REQUIRED') window.dispatchEvent(new Event('axiarix:mfa-required'));
     return Promise.reject(error);
   },
 );

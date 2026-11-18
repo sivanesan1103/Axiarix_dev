@@ -189,6 +189,26 @@ describe.sequential('separation of duties', () => {
     expect((await admin.post(`/api/v1/checklists/versions/${versionId}/publish`)).status).toBe(200);
   });
 
+  it('checklists need two people only: the author and one reviewer; new versions follow the same rule', async () => {
+    // The administrator writes a checklist; the ISMS owner (not the author) submits it to themselves and publishes.
+    const t = await admin.post('/api/v1/checklists', { title: 'Two-person review' });
+    const v1 = (await admin.get(`/api/v1/checklists/${t.body.data.id}`)).body.data.versions[0].id as string;
+    await admin.post(`/api/v1/checklists/versions/${v1}/items`, { question: 'Media is wiped before disposal', mappings: [{ type: 'ANNEX_A', reference: '7.14' }] });
+    const names = (await isms.get(`/api/v1/checklists/versions/${v1}/eligible-reviewers`)).body.data.map((u: { name: string }) => u.name);
+    expect(names).toContain('Lakshmi Iyer'); // the caller, not the author
+    expect(names).not.toContain('Arjun Mehta'); // the author
+    expect((await isms.post(`/api/v1/checklists/versions/${v1}/submit-review`, { reviewerId: base.users['isms@axiarix.local'] })).status).toBe(200);
+    expect((await admin.post(`/api/v1/checklists/versions/${v1}/publish`)).body.error.code).toBe('SEGREGATION_OF_DUTIES'); // the author cannot publish
+    expect((await isms.post(`/api/v1/checklists/versions/${v1}/publish`)).status).toBe(200);
+
+    // The ISMS owner creates version 2: now they are its author, so the administrator reviews it.
+    const v2 = await isms.post(`/api/v1/checklists/${t.body.data.id}/versions`, { changeSummary: 'Add disposal certificate' });
+    expect(v2.status).toBe(201);
+    expect((await isms.post(`/api/v1/checklists/versions/${v2.body.data.id}/submit-review`, { reviewerId: base.users['isms@axiarix.local'] })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await isms.post(`/api/v1/checklists/versions/${v2.body.data.id}/submit-review`, { reviewerId: base.users['admin@axiarix.local'] })).status).toBe(200);
+    expect((await admin.post(`/api/v1/checklists/versions/${v2.body.data.id}/publish`)).status).toBe(200);
+  });
+
   it('checklist status filter matches the latest version only', async () => {
     const t = (await prisma.checklistVersion.findUniqueOrThrow({ where: { id: state.versionId } })).templateId;
     const v2 = await isms.post(`/api/v1/checklists/${t}/versions`, { changeSummary: 'Second revision' });
@@ -227,21 +247,103 @@ describe.sequential('separation of duties', () => {
     expect(ok.body.data.periodEnd).toBe('2026-12-31T00:00:00.000Z');
     const id = ok.body.data.id as string;
     await isms.post(`/api/v1/assessments/${id}/release`);
-    // The administrator answers every question as N/A and submits: they are now a preparer.
     const items = await prisma.checklistItem.findMany({ where: { versionId: state.versionId } });
+    // System Administrators oversee assessments but do not fill them in.
+    const adminFlags = (await admin.get(`/api/v1/assessments/${id}`)).body.data.actions;
+    expect(adminFlags.respond).toBe(false);
+    expect((await admin.put(`/api/v1/assessments/${id}/responses/${items[0].id}`, { status: 'COMPLIANT' })).status).toBe(403);
+
+    // Someone who is the department's IT owner and also an auditor and ISMS owner prepares it…
+    const roleId = async (key: string) => (await prisma.role.findFirstOrThrow({ where: { organisationId: base.ctx.org.id, key } })).id;
+    const dual = await prisma.user.create({ data: { email: 'dual.role@axiarix.local', name: 'Dual Role', organisationId: base.ctx.org.id, passwordHash: await hashPassword(PASSWORD), status: 'ACTIVE' } });
+    await prisma.userRole.createMany({
+      data: [
+        { userId: dual.id, roleId: await roleId('IT_OWNER'), organisationId: base.ctx.org.id, siteId: base.ctx.primary.id, departmentId: base.ctx.primaryDept.id },
+        { userId: dual.id, roleId: await roleId('AUDITOR'), organisationId: base.ctx.org.id },
+        { userId: dual.id, roleId: await roleId('ISMS_OWNER'), organisationId: base.ctx.org.id },
+      ],
+    });
+    const dualClient = await login('dual.role@axiarix.local');
     for (const i of items) {
-      const r = await admin.put(`/api/v1/assessments/${id}/responses/${i.id}`, { status: 'NOT_APPLICABLE', justification: 'Out of scope for this test' });
+      const r = await dualClient.put(`/api/v1/assessments/${id}/responses/${i.id}`, { status: 'NOT_APPLICABLE', justification: 'Out of scope for this test' });
       expect(r.status).toBe(200);
     }
-    expect((await admin.post(`/api/v1/assessments/${id}/submit`)).status).toBe(200);
-    const flags = (await admin.get(`/api/v1/assessments/${id}`)).body.data.actions;
+    expect((await dualClient.post(`/api/v1/assessments/${id}/submit`)).status).toBe(200);
+    // …so they can neither audit nor approve it.
+    const flags = (await dualClient.get(`/api/v1/assessments/${id}`)).body.data.actions;
     expect(flags.startReview).toBe(false);
     expect(flags.blocked.review).toMatch(/prepared this assessment/);
-    expect((await admin.post(`/api/v1/assessments/${id}/start-review`)).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await dualClient.post(`/api/v1/assessments/${id}/start-review`)).body.error.code).toBe('SEGREGATION_OF_DUTIES');
     expect((await auditor.post(`/api/v1/assessments/${id}/start-review`)).status).toBe(200);
     for (const i of items) await auditor.post(`/api/v1/assessments/${id}/items/${i.id}/review`, { decision: 'ACCEPTED' });
-    expect((await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'Reviewed' })).body.data.status).toBe('PENDING_APPROVAL');
-    expect((await admin.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
+    expect((await auditor.post(`/api/v1/assessments/${id}/review/submit`, { opinion: 'All answers and evidence reviewed; controls operating.' })).body.data.status).toBe('PENDING_APPROVAL');
+    expect((await dualClient.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).body.error.code).toBe('SEGREGATION_OF_DUTIES');
     expect((await isms.post(`/api/v1/assessments/${id}/approval`, { decision: 'APPROVED' })).status).toBe(200);
+  });
+});
+
+describe.sequential('tasks go only to people who can do them', () => {
+  it('questions, findings and assessment owners must work in the record\'s branch and department', async () => {
+    const itOwner = await login('itowner@axiarix.local');
+    const alwarpet = base.users['itowner.alwarpet@axiarix.local'];
+    // An owner from another branch is refused when creating an assessment.
+    const wrongOwner = await isms.post('/api/v1/assessments', {
+      title: 'Owner scope test', siteId: base.ctx.primary.id, departmentId: base.ctx.primaryDept.id, checklistVersionId: state.versionId,
+      periodLabel: 'Q4 FY2026-27', startDate: '2027-01-02', dueDate: '2027-03-15', ownerId: alwarpet,
+    });
+    expect(wrongOwner.status).toBe(400);
+    expect(wrongOwner.body.error.message).toMatch(/no access to this branch and department/);
+    const a = await isms.post('/api/v1/assessments', {
+      title: 'Task scope test', siteId: base.ctx.primary.id, departmentId: base.ctx.primaryDept.id, checklistVersionId: state.versionId,
+      periodLabel: 'Q4 FY2026-27', startDate: '2027-01-02', dueDate: '2027-03-15', ownerId: base.users['itowner@axiarix.local'],
+    });
+    expect(a.status).toBe(201);
+    state.taskAssessment = a.body.data.id;
+    await isms.post(`/api/v1/assessments/${a.body.data.id}/release`);
+    const item = await prisma.checklistItem.findFirstOrThrow({ where: { versionId: state.versionId } });
+    // Question assignment: someone from another branch is refused, a colleague in the department is accepted.
+    expect((await itOwner.post(`/api/v1/assessments/${a.body.data.id}/assign`, { itemIds: [item.id], assigneeId: alwarpet })).status).toBe(400);
+    expect((await itOwner.post(`/api/v1/assessments/${a.body.data.id}/assign`, { itemIds: [item.id], assigneeId: base.users['contributor@axiarix.local'] })).status).toBe(200);
+    // The contributor sees the work in their task list.
+    const contributor = await login('contributor@axiarix.local');
+    const tasks = (await contributor.get('/api/v1/dashboard/tasks')).body.data;
+    expect(tasks.myQuestions.some((t: { id: string; assignedToMe: number }) => t.id === a.body.data.id && t.assignedToMe === 1)).toBe(true);
+  });
+
+  it('an open assessment can be handed to another owner in the same department, with a recorded reason', async () => {
+    const id = state.taskAssessment as string;
+    const alwarpet = base.users['itowner.alwarpet@axiarix.local'];
+    // Someone from another branch is refused; the current owner is refused; a reason is required.
+    expect((await isms.post(`/api/v1/assessments/${id}/owner`, { ownerId: alwarpet, reason: 'Moving work' })).status).toBe(400);
+    expect((await isms.post(`/api/v1/assessments/${id}/owner`, { ownerId: base.users['itowner@axiarix.local'], reason: 'Same person' })).status).toBe(400);
+    expect((await isms.post(`/api/v1/assessments/${id}/owner`, { ownerId: base.users['admin@axiarix.local'], reason: '' })).status).toBe(422);
+    const ok = await isms.post(`/api/v1/assessments/${id}/owner`, { ownerId: base.users['admin@axiarix.local'], reason: 'Owner on leave this quarter' });
+    expect(ok.status).toBe(200);
+    expect((await isms.get(`/api/v1/assessments/${id}`)).body.data).toMatchObject({ ownerId: base.users['admin@axiarix.local'], ownerHasAccess: true });
+    expect(await prisma.auditEvent.count({ where: { action: 'ASSESSMENT_OWNER_CHANGED', entityId: id } })).toBe(1);
+    // Contributors cannot change the owner.
+    const contributor = await login('contributor@axiarix.local');
+    expect((await contributor.post(`/api/v1/assessments/${id}/owner`, { ownerId: base.users['itowner@axiarix.local'], reason: 'Try' })).status).toBe(403);
+    await isms.post(`/api/v1/assessments/${id}/owner`, { ownerId: base.users['itowner@axiarix.local'], reason: 'Owner back' });
+  });
+
+  it('the review list is based on approval permission, and only the reviewer or comment author resolves comments', async () => {
+    const t = await isms.post('/api/v1/checklists', { title: 'Reviewer list test' });
+    const v = (await isms.get(`/api/v1/checklists/${t.body.data.id}`)).body.data.versions[0].id as string;
+    await isms.post(`/api/v1/checklists/versions/${v}/items`, { question: 'Access reviews are performed quarterly', mappings: [{ type: 'ANNEX_A', reference: '5.18' }] });
+    const names = (await isms.get(`/api/v1/checklists/versions/${v}/eligible-reviewers`)).body.data.map((u: { name: string }) => u.name);
+    expect(names).toContain('Arjun Mehta'); // administrator: has checklist:approve
+    expect(names).not.toContain('Lakshmi Iyer'); // the author
+    expect(names).not.toContain('Rahul Varma'); // auditors cannot approve checklists
+    await isms.post(`/api/v1/checklists/versions/${v}/submit-review`, { reviewerId: base.users['admin@axiarix.local'] });
+    const c = await admin.post(`/api/v1/checklists/versions/${v}/review-comments`, { body: 'Add the review frequency to the evidence requirement' });
+    expect(c.status).toBe(201);
+    // The author cannot dismiss the reviewer's comment; the reviewer can resolve it.
+    expect((await isms.post(`/api/v1/checklists/review-comments/${c.body.data.id}/resolve`)).status).toBe(403);
+    const list = (await isms.get(`/api/v1/checklists/versions/${v}/review-comments`)).body.data;
+    expect(list[0].canResolve).toBe(false);
+    // The named reviewer sees the review in their task list.
+    expect((await admin.get('/api/v1/dashboard/tasks')).body.data.checklistReviews.some((x: { id: string }) => x.id === v)).toBe(true);
+    expect((await admin.post(`/api/v1/checklists/review-comments/${c.body.data.id}/resolve`)).status).toBe(200);
   });
 });

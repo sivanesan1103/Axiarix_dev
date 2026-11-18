@@ -89,6 +89,21 @@ describe('authentication', () => {
     await login('contributor@axiarix.local', 'New-Strong-Pass-2026');
   });
 
+  it('invites new users with a 72-hour set-password link, while resets stay at 30 minutes', async () => {
+    const admin = await login('admin@axiarix.local');
+    const res = await admin.post('/api/v1/users', { name: 'Invited Person', email: 'invited@axiarix.local', sendInvite: true, roles: [{ roleKey: 'CONTRIBUTOR' }] });
+    expect(res.status).toBe(201);
+    const invited = await prisma.user.findUniqueOrThrow({ where: { email: 'invited@axiarix.local' } });
+    const hours = (invited.passwordResetExpires!.getTime() - Date.now()) / 3_600_000;
+    expect(hours).toBeGreaterThan(71);
+    expect(hours).toBeLessThanOrEqual(72);
+    expect(await prisma.auditEvent.count({ where: { action: 'USER_INVITED', entityId: invited.id } })).toBe(1);
+
+    await request(app).post('/api/v1/auth/forgot-password').send({ email: 'invited@axiarix.local' });
+    const reset = await prisma.user.findUniqueOrThrow({ where: { email: 'invited@axiarix.local' } });
+    expect((reset.passwordResetExpires!.getTime() - Date.now()) / 60_000).toBeLessThanOrEqual(30);
+  });
+
   it('logs out and invalidates the refresh token', async () => {
     const s = await login('auditor@axiarix.local');
     const out = await s.agent.post('/api/v1/auth/logout').set('X-Requested-With', 'axiarix');

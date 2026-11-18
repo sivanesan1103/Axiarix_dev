@@ -1,3 +1,4 @@
+import { getSetting } from '../../services/settings.service.js';
 import { Router, type CookieOptions, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -54,7 +55,8 @@ authRouter.post(
     const result = await auth.login(req, req.body.email, req.body.password, req.body.mfaCode);
     if (result.mfaRequired) return ok(res, { mfaRequired: true });
     res.cookie(REFRESH_COOKIE, result.refreshToken, cookieOptions);
-    ok(res, { mfaRequired: false, accessToken: result.accessToken, user: result.user, mfaEnrolmentRequired: result.mfaEnrolmentRequired });
+    const { timeZone } = await getSetting('locale.config', result.user.organisationId);
+    ok(res, { mfaRequired: false, accessToken: result.accessToken, user: { ...result.user, timeZone }, mfaEnrolmentRequired: result.mfaEnrolmentRequired });
   },
 );
 
@@ -62,7 +64,8 @@ authRouter.post('/refresh', requireCsrfHeader, async (req, res) => {
   try {
     const result = await auth.refresh(req, req.cookies?.[REFRESH_COOKIE]);
     res.cookie(REFRESH_COOKIE, result.refreshToken, cookieOptions);
-    ok(res, { accessToken: result.accessToken, user: result.user });
+    const { timeZone } = await getSetting('locale.config', result.user.organisationId);
+    ok(res, { accessToken: result.accessToken, user: { ...result.user, timeZone } });
   } catch (err) {
     res.clearCookie(REFRESH_COOKIE, { ...cookieOptions, maxAge: undefined });
     throw err;
@@ -86,7 +89,11 @@ authRouter.post('/reset-password', authLimiter, validate(z.object({ token: z.str
   ok(res, { message: 'Password updated. Please sign in.', email });
 });
 
-authRouter.get('/me', authenticate, (req, res) => ok(res, auth.publicUser(req.user!)));
+authRouter.get('/me', authenticate, async (req, res) => {
+  // The organisation's display time zone travels with the profile so every screen formats dates alike.
+  const { timeZone } = await getSetting('locale.config', req.user!.organisationId);
+  ok(res, { ...auth.publicUser(req.user!), timeZone });
+});
 
 authRouter.post(
   '/change-password',

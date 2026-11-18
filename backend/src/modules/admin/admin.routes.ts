@@ -6,7 +6,7 @@ import { validate } from '../../middleware/common.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { sendTestEmail } from '../../services/notification.service.js';
 import { getSetting, setSetting, settingSchemas, type SettingKey } from '../../services/settings.service.js';
-import { badRequest, invalidState, notFound } from '../../utils/errors.js';
+import { badRequest, invalidState, notFound, validationError } from '../../utils/errors.js';
 import { created, ok, param } from '../../utils/http.js';
 import * as svc from './admin.service.js';
 import { administeredSiteIds } from '../../services/admin-scope.service.js';
@@ -66,6 +66,10 @@ adminRouter.put('/settings/:key', requirePermission('settings:update'), async (r
   const key = param(req, 'key') as SettingKey;
   if (!(key in settingSchemas)) throw notFound('Setting');
   const before = await getSetting(key, req.user!.organisationId);
+  // Switching on enforced MFA would immediately lock out an administrator who has not enrolled themselves.
+  if (key === 'security.policy' && req.body?.enforceMfaForPrivileged === true && !(before as { enforceMfaForPrivileged?: boolean }).enforceMfaForPrivileged && !req.user!.mfaEnabled) {
+    throw validationError('Set up two-step verification on your own account first (Settings → Profile & security), then switch enforcement on.');
+  }
   await setSetting(key, req.body, req.user!.id, req.user!.organisationId);
   await recordAudit({ req, action: 'SETTINGS_CHANGED', entityType: 'SystemSetting', entityId: key, metadata: { before, after: req.body } });
   ok(res, await getSetting(key, req.user!.organisationId));
@@ -154,8 +158,8 @@ adminRouter.put(
 
 adminRouter.post('/retention/run', requirePermission('settings:update'), async (req, res) => ok(res, await svc.applyRetention(req, req.user!.organisationId)));
 
-adminRouter.get('/deletion-requests', requirePermission('settings:read'), async (_req, res) => {
-  const rows = await prisma.deletionRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+adminRouter.get('/deletion-requests', requirePermission('settings:read'), async (req, res) => {
+  const rows = await prisma.deletionRequest.findMany({ where: { organisationId: req.user!.organisationId }, orderBy: { createdAt: 'desc' }, take: 200 });
   const userIds = [...new Set(rows.flatMap((r) => [r.requestedById, r.decidedById]).filter((x): x is string => !!x))];
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } });
   ok(res, rows.map((r) => ({ ...r, requestedBy: users.find((u) => u.id === r.requestedById) ?? { id: r.requestedById, name: r.requestedById === 'system' ? 'Retention job' : 'Unknown' }, decidedBy: users.find((u) => u.id === r.decidedById) ?? null })));

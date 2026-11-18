@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -25,7 +26,7 @@ const actionSchema = z.object({
   targetDate: z.string().min(1, 'Target date is required'),
 });
 
-export function ActionFormDialog({ open, onOpenChange, title, initial, siteId, onSubmit, submitting }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; initial?: Partial<z.infer<typeof actionSchema>>; siteId?: string; onSubmit: (v: z.infer<typeof actionSchema>) => void; submitting: boolean }) {
+export function ActionFormDialog({ open, onOpenChange, title, initial, siteId, departmentId, onSubmit, submitting }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; initial?: Partial<z.infer<typeof actionSchema>>; siteId?: string; departmentId?: string; onSubmit: (v: z.infer<typeof actionSchema>) => void; submitting: boolean }) {
   const form = useForm<z.infer<typeof actionSchema>>({
     resolver: zodResolver(actionSchema),
     values: { rootCause: initial?.rootCause ?? '', immediateCorrection: initial?.immediateCorrection ?? '', correctiveAction: initial?.correctiveAction ?? '', ownerId: initial?.ownerId ?? '', targetDate: initial?.targetDate ?? new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) },
@@ -47,7 +48,7 @@ export function ActionFormDialog({ open, onOpenChange, title, initial, siteId, o
               <Textarea id="ca-ca" rows={3} {...form.register('correctiveAction')} />
             </Field>
             <Field label="Responsible owner" required error={e.ownerId?.message} htmlFor="ca-owner">
-              <UserSelect id="ca-owner" value={form.watch('ownerId')} onChange={(v) => form.setValue('ownerId', v, { shouldValidate: true })} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={siteId} />
+              <UserSelect id="ca-owner" value={form.watch('ownerId')} onChange={(v) => form.setValue('ownerId', v, { shouldValidate: true })} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={siteId} departmentId={departmentId} />
             </Field>
             <Field label="Target completion date" required error={e.targetDate?.message} htmlFor="ca-date">
               <Input id="ca-date" type="date" {...form.register('targetDate')} />
@@ -123,6 +124,7 @@ function EditFindingDialog({ f, open, onOpenChange, onSaved }: { f: FindingDetai
 
 export function FindingDetailPage() {
   const { id = '' } = useParams();
+  const { can } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['finding', id], queryFn: () => findingsService.get(id) });
@@ -185,7 +187,7 @@ export function FindingDetailPage() {
           </>
         }
       />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
         <div className="space-y-6">
           <Card>
             <CardBody className="pt-5">
@@ -267,7 +269,8 @@ export function FindingDetailPage() {
             <CardHeader
               title="Finding evidence"
               actions={
-                f.status !== 'CLOSED' && (
+                f.status !== 'CLOSED' &&
+                can('evidence:create') && (
                   <Button size="sm" variant="soft" onClick={() => setDlg('upload')}>
                     <Upload /> Upload
                   </Button>
@@ -314,7 +317,7 @@ export function FindingDetailPage() {
           <DialogHeader title="Assign finding owner" />
           <DialogBody>
             <Field label="Owner" required>
-              <UserSelect value={assignee} onChange={setAssignee} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={f.site.id} />
+              <UserSelect value={assignee} onChange={setAssignee} roles={['IT_OWNER', 'CONTRIBUTOR']} siteId={f.site.id} departmentId={f.departmentId} />
             </Field>
           </DialogBody>
           <DialogFooter>
@@ -325,7 +328,7 @@ export function FindingDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <ActionFormDialog open={dlg === 'action'} onOpenChange={(o) => !o && setDlg(null)} title={`Plan corrective action for ${f.code}`} initial={{ ownerId: f.ownerId ?? '' }} siteId={f.site.id} onSubmit={(v) => plan.mutate(v)} submitting={plan.isPending} />
+      <ActionFormDialog open={dlg === 'action'} onOpenChange={(o) => !o && setDlg(null)} title={`Plan corrective action for ${f.code}`} initial={{ ownerId: f.ownerId ?? '' }} siteId={f.site.id} departmentId={f.departmentId} onSubmit={(v) => plan.mutate(v)} submitting={plan.isPending} />
       <Dialog open={dlg === 'close'} onOpenChange={(o) => !o && setDlg(null)}>
         <DialogContent>
           <DialogHeader title={`Verify & close ${f.code}`} description={allVerified ? 'All corrective actions are verified.' : f.actions.length ? 'Some corrective actions are not yet verified — closing is blocked until they are.' : 'No corrective action exists. Closing requires an override reason (e.g. observation with no action required).'} />

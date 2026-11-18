@@ -1,6 +1,7 @@
 # Axiarix – Project Progress & Running History
 
-> Living log. Updated after each phase. Last update: **2026-11-13** (session 1 – all 8 phases complete).
+> Living log. Updated after each phase. Last update: **2026-11-17** (multi-organisation governance, task-flow fixes, BRD/SRS traceability check).
+> On this machine Postgres runs on **5434** and the web on **5174** (5433/5173 belong to another project); see README.
 > Source of truth: `../prompt.md`, BRD, SRS and the Kauvery Excel checklist in the parent folder.
 > UI/UX theme reference: `../Screenshot 2026-11-13 at 3.52.31 PM.png` (white canvas, icon-rail sidebar, vivid indigo `#4B10F0`, lavender tints, green/amber accents, KPI strip, clean tables).
 > Handwritten requirements note (`../WhatsApp Image …jpeg`) — 8 points, all covered: central checklist, periodic updates, quarterly IA, central evidence, unit-wise (branch) reports, auditor verification, final PDF after auditor update, dashboard + central report storage.
@@ -106,3 +107,21 @@ Hosting, identity/SSO & MFA enforcement, exact quarterly calendar, checklist/SoA
   - Added per-account dev addresses (`<name>.localhost:5173`) with `?email=` prefill so several accounts can be signed in side by side in one Chrome profile.
   - Added dark mode (Light / Dark / System): token remap, top-bar toggle, Settings → Appearance, pre-paint script, themed charts and toasts. Verified in a dark render; frontend unit 11/11; E2E 2/2 in 3 of 4 runs (one intermittent visibility timeout).
   - Not done automatically: dev DB reset (Prisma requires explicit user consent) – dev DB still contains "E2E" records; run `cd backend && npm run db:reset` to restore clean demo data.
+
+- **S2 – 2026-11-16**
+  - Full dev DB reset (with consent). Added several organisations per installation (platform owner, wizard, setup workbook), per-user restrictions, branch administrators and separation of duties; per-organisation settings and roles (migration `multi_org_restrictions_review`).
+  - UI: grouped sidebar, Scope button, URL filters, Admin Home, period pickers, checklist review with named reviewer and comments.
+  - Created Meridian Diagnostics (Sample) through the wizard in Chrome; 9 users accepted invitations; fixed 5 bugs found during onboarding.
+  - Fixed review and task flow: every answer and file needs a decision; assignees limited to the record's department; Change owner; Pending tasks for every role; finding owners plan actions; restricted buttons hidden; dialog buttons visible on short screens. Whole workflow run in Chrome with five Meridian users.
+  - Pushed to GitHub (`main`, then branch `fix/task-flow-and-audit-review`).
+
+- **S3 – 2026-11-17**
+  - Checked every BRD and SRS requirement against the app: `docs/REQUIREMENTS_TRACEABILITY.md`.
+  - Closed three gaps: checklist question search (FR-027), dashboard department filter and comparison (FR-021), configurable display time zone for screens and PDF (SRS 2.3, NFR-10). New `backend/tests/requirements.test.ts`.
+  - Updated API, roles, database, architecture, testing, short user guide and final report docs.
+  - Tests: backend 69/69, frontend 11/11, E2E 2/2.
+  - Later the same day: checked untested workflow branches (`flows.test.ts`, 9 tests). Fixed deletion requests leaking across organisations (migration `deletion_request_organisation`) and a production proxy setting that would have made all users share one rate limit (`TRUST_PROXY`, `API_RATE_LIMIT`). Added enforced MFA for privileged roles (with a guard so an administrator cannot lock themselves out) and a load test (`npm run test:load`: 50 users p95 104 ms). Tests: backend 78/78, frontend 11/11, E2E 2/2.
+  - Real-time updates (Server-Sent Events): every open screen refreshes the affected data about a second after anyone saves a change; Live indicator in the top bar. Fixed along the way: refresh bursts could hit the per-address rate limit when many users share one address (tab-own changes skipped, background tabs refresh on return, bursts combined, 429 on renewal retried, higher limit in development, rate-limited requests now logged). E2E made independent of list length. Tests: backend 81/81, frontend 11/11, E2E 2/2 (twice).
+  - Flow bug hunt: opened every page as all 17 Kauvery/Meridian accounts plus the platform owner (387 pages) and at phone width (147 pages). Fixed: checklist, finding and corrective-action detail pages scrolled sideways on phones (single-column layouts sized to their tables); refusal and not-found screens now say so and offer "Go back" instead of a useless "Try again". New UI browser tests (`flows.spec.ts`) for clarification round, rejected approval, reopen and returned corrective action — all pass. Tests: backend 81, frontend 11, E2E 4/4 (twice).
+  - System Administrators no longer fill in assessments (no workspace, My Assessments or submit); they keep view, Change owner, release, export and reopen. Separation-of-duties test now uses a person holding IT owner + auditor + ISMS owner roles. Walkthrough steps 23–26 updated.
+  - Checklist review simplified to two people: the reviewer only has to differ from the version's author (the submitter may name themselves). E.g. admin writes → ISMS owner submits to themselves and publishes; ISMS owner's new version → admin reviews. Test added (backend 82).
